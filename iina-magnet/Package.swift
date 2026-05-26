@@ -31,7 +31,7 @@ let package = Package(
             name: "IinaMagnet",
             path: "Sources/IinaMagnet",
             resources: [
-                // Disclaimer markdown will move here in Issue 02.
+                .process("Resources")  // Disclaimer.{zh-Hans,en}.md (Issue 02)
             ]
         ),
         .testTarget(

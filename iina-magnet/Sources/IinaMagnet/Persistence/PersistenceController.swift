@@ -32,8 +32,14 @@ public final class PersistenceController {
     public let container: ModelContainer
 
     private init(inMemory: Bool) {
-        // Phase 0: empty schema. Subsequent issues will append types here.
-        let schema = Schema([])
+        // Schema grows per issue:
+        //   - Issue 02: DisclaimerAcceptance
+        //   - Issue 10: SubscriptionSource / SubscriptionRule / FeedItem
+        //   - Issue 06: TorrentTask
+        //   - Phase 2: Title / Season / Episode / VersionFile / Tag / WatchProgress
+        let schema = Schema([
+            DisclaimerAcceptance.self,
+        ])
 
         do {
             if inMemory {
