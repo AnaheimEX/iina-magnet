@@ -9,6 +9,8 @@
 import Cocoa
 import MediaPlayer
 import Sparkle
+// MARK: iina-magnet hook
+import IinaMagnet
 
 let IINA_ENABLE_PLUGIN_SYSTEM = true
 let IINA_ENABLE_NEW_SETTINGS = UserDefaults.standard.bool(forKey: "enableNewSettings")
@@ -355,6 +357,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
   func applicationDidFinishLaunching(_ aNotification: Notification) {
     Logger.log("App launched")
+
+    // MARK: iina-magnet hook
+    IinaMagnetBootstrap.start()
 
     if !isReady {
       getReady()
@@ -741,6 +746,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
   func applicationWillTerminate(_ notification: Notification) {
     Logger.log("App will terminate")
+    // MARK: iina-magnet hook
+    IinaMagnetBootstrap.shutdown()
     Logger.closeLogFile()
   }
 
