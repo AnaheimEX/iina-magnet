@@ -20,6 +20,8 @@
 | # | 文件 | 行数（最近一次 sync 时） | hook 用途 | 由哪个 Issue 引入 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | H-001 | `Configs/Deployment.xcconfig` | 12-13 | macOS 部署目标从 11/12 升到 14（SwiftData 要求） | Issue 01 (Phase 0) | active |
+| H-002 | `other/download_libs.sh` | 3-4 | `PROJECT_NAME` 由 env 覆盖（fork repo 目录名 `iina-magnet` ≠ 上游硬编码的 `iina`） | Issue 01 (Phase 0) | active |
+| H-003 | `.github/workflows/ci.yml` | 24-25 | `Install dependencies` step 加 `PROJECT_NAME: iina-magnet` env | Issue 01 (Phase 0) | active |
 
 ### 即将引入（按 Issue 计划）
 
@@ -36,7 +38,9 @@
 
 每次 sync 之后人工核对：
 
-- [ ] **H-001**：`Configs/Deployment.xcconfig` 中第 12-13 行仍为 `MACOSX_DEPLOYMENT_TARGET = 14`（含 arm64 override）
+- [ ] **H-001**：`Configs/Deployment.xcconfig` 中 `MACOSX_DEPLOYMENT_TARGET = 14`（含 arm64 override）
+- [ ] **H-002**：`other/download_libs.sh` 第 3-4 行仍是 `PROJECT_NAME="${PROJECT_NAME:-iina}"`（env-overridable，不是硬编码 `'iina'`）
+- [ ] **H-003**：`.github/workflows/ci.yml` `Install dependencies` step 仍包含 `PROJECT_NAME: iina-magnet` env
 - [ ] (后续 hook 引入后扩展此清单)
 
 如有 hook 在 upstream 被 "无意覆盖"（如 upstream 改了 AppDelegate 把我们的 hook line 移走），在 sync 分支立即补回，commit message 用 `fix(iina-sync): restore hook H-NNN after upstream refactor`。
