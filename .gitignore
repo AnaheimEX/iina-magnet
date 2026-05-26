@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+*.swp
+
+# Xcode / Swift (待 Phase 0 引入)
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.build/
+Packages/
+Package.resolved
+*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+
+# libtorrent build artifacts
+lib/libtorrent/build/
+lib/libtorrent/prefix/
+lib/libtorrent/lib/*.a
+lib/libtorrent/include/
+
+# iina source clone (vendored after Phase 0)
+iina-source/
+
+# Agent tooling
+.omc/
+.claude/
+*.log
+
+# Local-only secrets / API keys
+.env
+.env.local
+*.key
+*.pem
+local-settings.json
