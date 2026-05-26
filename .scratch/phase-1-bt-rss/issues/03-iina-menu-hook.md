@@ -1,6 +1,6 @@
 # Issue 03 · iina 主菜单 Hook + Magnet 顶层菜单
 
-Status: ready-for-agent
+Status: in-progress (PR #3 open, stacked on PR #2)
 Sprint: 0 (Foundation)
 Created: 2026-05-26
 Updated: 2026-05-26

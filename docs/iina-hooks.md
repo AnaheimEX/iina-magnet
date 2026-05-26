@@ -24,6 +24,8 @@
 | H-003 | `.github/workflows/ci.yml` | 24-25 | `Install dependencies` step 加 `PROJECT_NAME: iina-magnet` env | Issue 01 (Phase 0) | active |
 | H-004 | `.github/workflows/ci.yml` | Build step | xcodebuild 加 `-derivedDataPath build`（fork 工作目录差异导致默认 hash 路径不可预测） | Issue 01 (Phase 0) | active |
 | H-005 | `.github/workflows/ci.yml` | Archive step | tar 改读 `build/Build/Products/Nightly`，配合 H-004 | Issue 01 (Phase 0) | active |
+| H-006 | `iina/AppDelegate.swift` | 顶部 import + `applicationDidFinishLaunching` + `applicationWillTerminate` | `import IinaMagnet` 及 `IinaMagnetBootstrap.start/.shutdown()` 调用 | Issue 03 (Phase 0) | active |
+| H-007 | `iina.xcodeproj/project.pbxproj` | XCLocalSwiftPackageReference + iina target 的 frameworks_build_phase | 将本地 SPM 包 `iina-magnet/` 接入 iina 主 target；由 `other/iina-magnet-link.rb` 脚本生成 | Issue 03 (Phase 0) | active |
 
 ### 即将引入（按 Issue 计划）
 
@@ -45,6 +47,8 @@
 - [ ] **H-003**：`.github/workflows/ci.yml` `Install dependencies` step 仍包含 `PROJECT_NAME: iina-magnet` env
 - [ ] **H-004**：`.github/workflows/ci.yml` Build step 仍含 `-derivedDataPath build`
 - [ ] **H-005**：`.github/workflows/ci.yml` Archive step 仍读 `build/Build/Products/Nightly`
+- [ ] **H-006**：`iina/AppDelegate.swift` 三处 hook：顶部 `import IinaMagnet`、`applicationDidFinishLaunching` 内 `IinaMagnetBootstrap.start()`、`applicationWillTerminate` 内 `IinaMagnetBootstrap.shutdown()`
+- [ ] **H-007**：`iina.xcodeproj/project.pbxproj` 仍含 `XCLocalSwiftPackageReference "iina-magnet"` 与 IinaMagnet 在 iina target frameworks 中。如冲突，直接 `ruby other/iina-magnet-link.rb` 重新生成（**幂等**）
 - [ ] (后续 hook 引入后扩展此清单)
 
 如有 hook 在 upstream 被 "无意覆盖"（如 upstream 改了 AppDelegate 把我们的 hook line 移走），在 sync 分支立即补回，commit message 用 `fix(iina-sync): restore hook H-NNN after upstream refactor`。
