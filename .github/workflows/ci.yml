@@ -21,6 +21,8 @@ jobs:
         run: ./other/download_libs.sh $DOWNLOAD_LIBS_ARGS
         env:
           DOWNLOAD_LIBS_ARGS: ${{ github.event_name == 'pull_request' && '--skip-plugins' || '' }}
+          # MARK: iina-magnet hook — repo is checked out as `iina-magnet/`, override the script's hardcoded 'iina'
+          PROJECT_NAME: iina-magnet
 
       - name: Build
         run: xcodebuild -project iina.xcodeproj ONLY_ACTIVE_ARCH=NO -scheme iina -configuration Nightly ${{ matrix.deployment_target }}
