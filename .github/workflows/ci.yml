@@ -25,12 +25,15 @@ jobs:
           PROJECT_NAME: iina-magnet
 
       - name: Build
-        run: xcodebuild -project iina.xcodeproj ONLY_ACTIVE_ARCH=NO -scheme iina -configuration Nightly ${{ matrix.deployment_target }}
+        # MARK: iina-magnet hook — pin DerivedData path so Archive step doesn't depend on Xcode's
+        # workdir-derived hash (the fork repo dir differs from upstream's, breaking the hardcoded hash)
+        run: xcodebuild -project iina.xcodeproj -derivedDataPath build ONLY_ACTIVE_ARCH=NO -scheme iina -configuration Nightly ${{ matrix.deployment_target }}
         env:
           DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
 
       - name: Archive
-        run: tar cvJf ~/iina.tar.xz -C /Users/runner/Library/Developer/Xcode/DerivedData/iina-csbkugdtxazzqogjnydbothqrvib/Build/Products/Nightly IINA.app 
+        # MARK: iina-magnet hook — read from pinned derivedDataPath instead of hashed upstream path
+        run: tar cvJf ~/iina.tar.xz -C build/Build/Products/Nightly IINA.app
 
       - name: Save artifacts
         uses: actions/upload-artifact@v6
