@@ -1,0 +1,35 @@
+name: iina-magnet package
+
+# Fast CI for the iina-magnet SPM package only.
+# Doesn't depend on iina deps (mpv/ffmpeg) so it runs in seconds.
+# The full iina build keeps its own workflow at ci.yml.
+
+on:
+  push:
+    branches:
+      - develop
+      - 'feature/**'
+      - 'sync/**'
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  swift-test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcrun --show-sdk-version
+
+      - name: Build IinaMagnet package
+        working-directory: iina-magnet
+        run: swift build
+
+      - name: Test IinaMagnet package
+        working-directory: iina-magnet
+        run: swift test
