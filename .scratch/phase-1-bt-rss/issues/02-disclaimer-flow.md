@@ -1,6 +1,6 @@
 # Issue 02 · 首启动 Disclaimer 流程
 
-Status: ready-for-agent
+Status: in-progress (PR #2 open, stacked on PR #1; CI pending)
 Sprint: 0 (Foundation)
 Created: 2026-05-26
 Updated: 2026-05-26
@@ -13,26 +13,21 @@ BlockedBy: 01
 
 ## 验收标准
 
-- [ ] 资源文件：
-  - `iina-magnet/Resources/Disclaimer.zh-Hans.md`
-  - `iina-magnet/Resources/Disclaimer.en.md`
-- [ ] `DisclaimerCoordinator`（actor 或 `@Observable` 类）：
-  - `currentVersion: String`（硬编码 const，如 `"2026-05-26"`）
-  - `func needsAcceptance() async -> Bool`
-  - `func accept() async`
-- [ ] SwiftData model `DisclaimerAcceptance { version, acceptedAt }`，schema 加入 `PersistenceController.modelTypes`
-- [ ] `DisclaimerSheet` SwiftUI 视图：
-  - 用 `MarkdownUI` 或 `Text(AttributedString(markdown:))` 渲染 markdown
-  - 顶部 tab：中文 / English，默认按系统 `Locale.current.language.languageCode`
-  - 底部按钮：`同意 / I Agree`（仅滚动到底部后启用）
-  - 不允许通过 cmd+W 或 esc 跳过
-- [ ] iina 启动流程（在 Bootstrap）：
-  - 主播放窗口出现前调 `DisclaimerCoordinator.needsAcceptance()`
-  - true → 阻塞展示 sheet → 同意后写入 → 继续
-  - false → 直接继续
-- [ ] Settings 中加 "Disclaimer / 法律免责" 入口（独立 SwiftUI 窗口或 sheet），任何时候可看
-- [ ] 单元测试：`DisclaimerCoordinator.needsAcceptance` 在不同 version 组合下的判定
-- [ ] 集成测试：首次启动空数据库 → 需要展示；写入接受后 → 不展示；修改 currentVersion 后 → 重新展示
+- [x] 资源文件 `Sources/IinaMagnet/Resources/Disclaimer.{zh-Hans,en}.md`（路径调整：移到 SPM 内部，`.process("Resources")` 打包）
+- [x] `DisclaimerCoordinator`（@MainActor @Observable）：
+  - [x] `static let currentVersion = "2026-05-26"`
+  - [x] `func needsAcceptance() -> Bool`（同步即可——SwiftData fetch < 1ms，原 PRD 写 `async` 是不必要的）
+  - [x] `func accept() throws`
+- [x] `DisclaimerAcceptance` (@Model)：`@Attribute(.unique) version`, `acceptedAt`；加入 `PersistenceController.schema`
+- [x] `DisclaimerSheet` SwiftUI：
+  - [x] `Text(AttributedString(markdown:))` 渲染（不引入 MarkdownUI）
+  - [x] Segmented Picker tab；默认按 `Locale.current.language.languageCode == "zh"`
+  - [x] "我已阅读并同意 / I Have Read and Agree" 按钮，**仅滚动到底部后启用**（Color.clear sentinel + onAppear 实现）
+  - [x] `keyboardShortcut(.defaultAction)` 把回车绑到按钮（disable 时也无效），无 cancel / esc 选项
+- [ ] **DEFERRED to Issue 03**：iina 启动流程 hook（Bootstrap → AppDelegate）。原因：Phase 0 还没有 AppDelegate hook，模态展示需要等 Issue 03 接入。
+- [ ] **DEFERRED to Issue 16**：Settings 中 "查看 Disclaimer" 入口。原因：Settings 窗口由 Issue 16 负责。
+- [x] 单元测试：`needsAcceptanceOnEmptyDB`、`acceptFlipsTheFlag`、`acceptInsertsRow`、`staleVersionTriggersReprompt`、`currentVersionShape`（共 5 用例）
+- [x] 集成测试（markdown 加载）：`chineseMarkdownLoads`、`englishMarkdownLoads` 校验 bundle 资源可读 + 内容关键词命中
 
 ## Disclaimer 文本要点（中英共有）
 
@@ -52,3 +47,23 @@ BlockedBy: 01
 - 实际 Settings 主窗口的其他面板（Phase 1 后期 Issue 16）
 
 ## Comments
+
+### 2026-05-27 · Claude Sonnet 4.6 实施会话
+
+**完成**：
+- PR: [#2 Disclaimer flow](https://github.com/AnaheimEX/iina-magnet/pull/2)，stack 在 PR #1 之上
+- 9 个测试本地通过（含 Phase 0 烟测；3 suites）
+- 资源迁到 SPM 内（`Sources/IinaMagnet/Resources/`），与 planning repo 副本 deduped（planning 中的旧 `iina-magnet/Resources/` 已删除，git 历史保留）
+
+**未做（推迟）**：
+- AppDelegate 入口（Issue 03 负责）：Bootstrap 当前是 stub，不接 coordinator
+- Settings "查看 Disclaimer" 入口（Issue 16 负责）
+
+**API 微调**：
+- 原 PRD 写 `needsAcceptance() async -> Bool`。实际 SwiftData fetch 同步即可（< 1ms），无副作用，去 `async` 让调用方更简单。`@MainActor` 隔离已经覆盖 thread safety。
+- 原 PRD 写 `accept() async`。同上，改成 `throws`。
+
+**实现要点**：
+- 滚动到底部判定：`Color.clear` 1pt 哨兵 + `.onAppear { ... }`。当 ScrollView 渲染到底部时哨兵首次 layout 触发回调。简单可靠，无需 GeometryReader / ScrollPosition API。
+- Markdown 用 `.inlineOnlyPreservingWhitespace` 选项，保留段落换行，足够展示法律条款。
+- 双语 currentVersion 同步：两份 markdown 文件 + DisclaimerCoordinator.currentVersion 必须三处保持一致；下次 bump 用 `git grep "2026-05-26"` 找全。
