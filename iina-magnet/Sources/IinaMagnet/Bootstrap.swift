@@ -33,6 +33,9 @@ public enum IinaMagnetBootstrap {
 
         installMagnetMenu()
         presentDisclaimerIfNeeded()
+
+        // Phase 1: start TorrentManager actor (Issue 06).
+        Task { await TorrentManager.shared.start() }
     }
 
     /// Called from `AppDelegate.applicationWillTerminate`.
@@ -41,7 +44,13 @@ public enum IinaMagnetBootstrap {
         guard didStart else { return }
         didStart = false
         logger.info("IinaMagnetBootstrap.shutdown")
-        // Phase 1 issues will add graceful libtorrent pause + resume-data save here.
+        // Synchronous shutdown so we don't race app exit; block briefly for the actor.
+        let sema = DispatchSemaphore(value: 0)
+        Task {
+            await TorrentManager.shared.shutdown()
+            sema.signal()
+        }
+        _ = sema.wait(timeout: .now() + 2)
     }
 
     // MARK: - Menu installation

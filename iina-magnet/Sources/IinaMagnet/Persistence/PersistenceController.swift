@@ -39,6 +39,7 @@ public final class PersistenceController {
         //   - Phase 2: Title / Season / Episode / VersionFile / Tag / WatchProgress
         let schema = Schema([
             DisclaimerAcceptance.self,
+            TorrentTask.self,
         ])
 
         do {
