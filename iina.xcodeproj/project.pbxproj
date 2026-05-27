@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1326717E20852D0D000FA7E2 /* SubChooseViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 1326718020852D0D000FA7E2 /* SubChooseViewController.xib */; };
+		216D04A1C540A07D7760E5AC /* IinaMagnetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3F191BFDC3FDCF810F8610 /* IinaMagnetBridge.swift */; };
 		3412DB8E2C2FC64C00BBC142 /* Equalizations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3412DB8D2C2FC64800BBC142 /* Equalizations.swift */; };
 		348F71962DE2A819006C587D /* MPVCommandWrappers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 348F71952DE2A814006C587D /* MPVCommandWrappers.swift */; };
 		34ACAB722C142A0500F871A0 /* libintl.8.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 34ACAB2D2C142A0300F871A0 /* libintl.8.dylib */; };
@@ -650,6 +651,7 @@
 		0507C27D2B5624AE0043AD05 /* he */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = he; path = he.lproj/Localizable.strings; sourceTree = "<group>"; };
 		0507C27E2B563C1D0043AD05 /* he */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = he; path = he.lproj/FilterPresets.strings; sourceTree = "<group>"; };
 		05B91AB22BFEE5E70012631C /* he */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = he; path = he.lproj/KeyBinding.strings; sourceTree = "<group>"; };
+		0C3F191BFDC3FDCF810F8610 /* IinaMagnetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IinaMagnetBridge.swift; sourceTree = "<group>"; };
 		1326717F20852D0D000FA7E2 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/SubChooseViewController.xib; sourceTree = "<group>"; };
 		133400111EB3831C007FE17E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainMenu.strings; sourceTree = "<group>"; };
 		133400121EB3831D007FE17E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/MainWindowController.strings; sourceTree = "<group>"; };
@@ -2757,6 +2759,7 @@
 				E3CAD4AD2146DB23000B373A /* Javascript */,
 				84A0BAA61D2FAF8400BC8DA1 /* Utils */,
 				518DB7002FA6A1480024F0B0 /* Scripts */,
+				0C3F191BFDC3FDCF810F8610 /* IinaMagnetBridge.swift */,
 			);
 			indentWidth = 2;
 			path = iina;
@@ -3459,6 +3462,7 @@
 				842F55A51EA17E7E0081D475 /* IINACommand.swift in Sources */,
 				840D47981DFEEE6A000D9A64 /* KeyMapping.swift in Sources */,
 				84BEEC3F1DFEDE2F00F945CA /* PrefKeyBindingViewController.swift in Sources */,
+				216D04A1C540A07D7760E5AC /* IinaMagnetBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
