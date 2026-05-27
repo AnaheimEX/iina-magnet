@@ -1,0 +1,7 @@
+# libtorrent build artifacts — only the script + README are committed.
+# Re-run build.sh to regenerate. Binaries are too large for git and arch-specific.
+
+build/
+include/
+lib/
+.built-*
