@@ -34,8 +34,11 @@ public enum IinaMagnetBootstrap {
         installMagnetMenu()
         presentDisclaimerIfNeeded()
 
-        // Phase 1: start TorrentManager actor (Issue 06).
-        Task { await TorrentManager.shared.start() }
+        // Phase 1: start TorrentManager (Issue 06) + SubscriptionScheduler (Issue 13).
+        Task {
+            await TorrentManager.shared.start()
+            await SubscriptionScheduler.shared.start()
+        }
     }
 
     /// Called from `AppDelegate.applicationWillTerminate`.
@@ -44,13 +47,14 @@ public enum IinaMagnetBootstrap {
         guard didStart else { return }
         didStart = false
         logger.info("IinaMagnetBootstrap.shutdown")
-        // Synchronous shutdown so we don't race app exit; block briefly for the actor.
+        // Synchronous shutdown so we don't race app exit; block briefly for the actors.
         let sema = DispatchSemaphore(value: 0)
         Task {
+            await SubscriptionScheduler.shared.shutdown()
             await TorrentManager.shared.shutdown()
             sema.signal()
         }
-        _ = sema.wait(timeout: .now() + 2)
+        _ = sema.wait(timeout: .now() + 3)
     }
 
     // MARK: - Menu installation
