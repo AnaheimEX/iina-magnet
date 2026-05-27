@@ -1,8 +1,8 @@
 name: iina-magnet package
 
-# Fast CI for the iina-magnet SPM package only.
-# Doesn't depend on iina deps (mpv/ffmpeg) so it runs in seconds.
-# The full iina build keeps its own workflow at ci.yml.
+# CI for the iina-magnet SPM package. The IinaMagnet target alone is fast,
+# but LibtorrentBridge depends on the vendored libtorrent static .a, so we
+# build (or restore from cache) lib/libtorrent/ before running swift test.
 
 on:
   push:
@@ -25,6 +25,20 @@ jobs:
         run: |
           swift --version
           xcrun --show-sdk-version
+          cmake --version || brew install cmake
+
+      - name: Restore libtorrent cache
+        id: lt-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            lib/libtorrent/include
+            lib/libtorrent/lib
+          key: libtorrent-${{ runner.os }}-${{ runner.arch }}-2.0.10-boost-1.84.0-v2
+
+      - name: Build libtorrent (cache miss)
+        if: steps.lt-cache.outputs.cache-hit != 'true'
+        run: ./lib/libtorrent/build.sh
 
       - name: Build IinaMagnet package
         working-directory: iina-magnet
