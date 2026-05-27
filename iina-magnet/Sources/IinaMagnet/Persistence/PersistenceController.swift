@@ -40,6 +40,9 @@ public final class PersistenceController {
         let schema = Schema([
             DisclaimerAcceptance.self,
             TorrentTask.self,
+            SubscriptionSource.self,
+            SubscriptionRule.self,
+            FeedItem.self,
         ])
 
         do {
