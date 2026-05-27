@@ -1,6 +1,7 @@
 #!/bin/bash
 
-PROJECT_NAME='iina'
+# MARK: iina-magnet hook — env override so forks (different repo dir name) can reuse this script
+PROJECT_NAME="${PROJECT_NAME:-iina}"
 
 # universal | arm64 | x86_64
 ARCH="universal"
