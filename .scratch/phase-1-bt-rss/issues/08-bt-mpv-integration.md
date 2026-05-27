@@ -1,6 +1,6 @@
 # Issue 08 · BT-mpv 集成（PlayerCore hook + StreamPlanner 调度）
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 2 (边看边播)
 Created: 2026-05-26
 Updated: 2026-05-26

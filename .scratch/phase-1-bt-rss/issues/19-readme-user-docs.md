@@ -1,6 +1,6 @@
 # Issue 19 · README 用户文档（订阅指南、规则指南、法律免责）
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 5 (验收)
 Created: 2026-05-26
 Updated: 2026-05-26

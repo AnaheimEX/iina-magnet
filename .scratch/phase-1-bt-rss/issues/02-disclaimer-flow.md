@@ -1,6 +1,6 @@
 # Issue 02 · 首启动 Disclaimer 流程
 
-Status: in-progress (PR #2 open, stacked on PR #1; CI pending)
+Status: completed (merged to develop)
 Sprint: 0 (Foundation)
 Created: 2026-05-26
 Updated: 2026-05-26

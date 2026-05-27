@@ -1,6 +1,6 @@
 # Issue 16 · Magnet Settings 窗口
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 4 (UI)
 Created: 2026-05-26
 Updated: 2026-05-26

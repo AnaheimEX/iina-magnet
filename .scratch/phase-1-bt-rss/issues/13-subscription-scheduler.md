@@ -1,6 +1,6 @@
 # Issue 13 · SubscriptionScheduler actor
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 3 (RSS)
 Created: 2026-05-26
 Updated: 2026-05-26

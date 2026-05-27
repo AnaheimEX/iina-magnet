@@ -1,6 +1,6 @@
 # Issue 06 · TorrentManager actor + alert pumping
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 1 (libtorrent 桥接)
 Created: 2026-05-26
 Updated: 2026-05-26

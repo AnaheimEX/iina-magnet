@@ -1,6 +1,6 @@
 # Issue 09 · SubtitleExtractor 深模块
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 2 (边看边播)
 Created: 2026-05-26
 Updated: 2026-05-26

@@ -1,6 +1,6 @@
 # Issue 17 · 端到端串联：Match → 下载 → 完成 → 移动 → 字幕
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 4 (UI / 集成)
 Created: 2026-05-26
 Updated: 2026-05-26

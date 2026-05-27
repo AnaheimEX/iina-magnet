@@ -1,6 +1,6 @@
 # Issue 01 · Fork iina 与工程基线
 
-Status: ready-to-merge (PR #1 — CI green, awaiting human approval)
+Status: completed (merged to develop)
 Sprint: 0 (Foundation)
 Created: 2026-05-26
 Updated: 2026-05-26
