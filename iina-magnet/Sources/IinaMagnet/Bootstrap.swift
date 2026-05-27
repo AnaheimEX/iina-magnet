@@ -154,10 +154,30 @@ final class MagnetMenuActions: NSObject {
     static let shared = MagnetMenuActions()
     private static let logger = Logger(subsystem: "iina-magnet", category: "menu")
 
-    @objc func showRssManager(_ sender: Any?)  { placeholder(name: "RSS Manager") }
-    @objc func showBtManager(_ sender: Any?)   { placeholder(name: "BT Manager") }
-    @objc func showLibrary(_ sender: Any?)     { placeholder(name: "Library") }
-    @objc func showSettings(_ sender: Any?)    { placeholder(name: "Settings") }
+    @objc func showRssManager(_ sender: Any?) {
+        WindowFactory.shared.open(.rssManager, title: "RSS Manager",
+                                  contentSize: .init(width: 1000, height: 640)) {
+            RssManagerView()
+                .modelContainer(PersistenceController.shared.container)
+        }
+    }
+
+    @objc func showBtManager(_ sender: Any?) {
+        WindowFactory.shared.open(.btManager, title: "BT Manager",
+                                  contentSize: .init(width: 1000, height: 540)) {
+            BtManagerView()
+                .modelContainer(PersistenceController.shared.container)
+        }
+    }
+
+    @objc func showLibrary(_ sender: Any?)  { placeholder(name: "Library (Phase 2)") }
+
+    @objc func showSettings(_ sender: Any?) {
+        WindowFactory.shared.open(.settings, title: "Settings",
+                                  contentSize: .init(width: 600, height: 460)) {
+            MagnetSettingsView()
+        }
+    }
 
     @objc func showDisclaimer(_ sender: Any?) {
         let coordinator = DisclaimerCoordinator(context: PersistenceController.shared.container.mainContext)
