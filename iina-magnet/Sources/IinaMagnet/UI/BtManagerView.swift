@@ -132,8 +132,8 @@ public struct BtManagerView: View {
     private func playFirst(ids: Set<PersistentIdentifier>) {
         guard let id = ids.first,
               let task = tasks.first(where: { $0.persistentModelID == id }) else { return }
-        // Phase 1 placeholder: just reveal in Finder; Issue 08 wires PlayerCore.
-        NSWorkspace.shared.activateFileViewerSelecting([task.savePath])
+        let hash = InfoHash(task.infoHash)
+        Task { await MagnetRouter.shared.playStreaming(infoHash: hash) }
     }
 
     private var byteFormatter: ByteCountFormatter {

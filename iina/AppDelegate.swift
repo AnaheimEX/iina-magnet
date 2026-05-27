@@ -359,6 +359,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     Logger.log("App launched")
 
     // MARK: iina-magnet hook
+    IinaBridgeRegistry.bridge = IinaMagnetBridgeImpl.shared
     IinaMagnetBootstrap.start()
 
     if !isReady {
