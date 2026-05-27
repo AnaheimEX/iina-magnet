@@ -55,50 +55,74 @@ public enum RssRuleEngine {
     /// Apply rules to items. One item produces at most one match — the first
     /// enabled rule (in the input order) that fires wins.
     public static func evaluate(items: [EngineFeedItem], rules: [EngineRule]) -> [EngineMatch] {
-        // Pre-compile regexes once; lookup by rule.id.
-        var compiled: [String: NSRegularExpression] = [:]
-        for rule in rules where rule.enabled {
-            guard let pat = rule.regex, !pat.isEmpty else { continue }
-            let opts: NSRegularExpression.Options = rule.caseSensitive ? [] : [.caseInsensitive]
-            if let re = try? NSRegularExpression(pattern: pat, options: opts) {
-                compiled[rule.id] = re
+        // Precompile per-rule artifacts so the inner loop stays cheap.
+        // - Regex compiled once; nil entry == "no regex"
+        // - Lowercased keyword arrays cached for case-insensitive rules
+        struct CompiledRule {
+            let original: EngineRule
+            let regex: NSRegularExpression?    // nil if rule has no regex or regex invalid
+            let regexInvalid: Bool             // true when rule wanted regex but it failed to compile
+            let include: [String]              // case-folded if !caseSensitive
+            let exclude: [String]
+        }
+
+        let compiledRules: [CompiledRule] = rules.compactMap { rule in
+            guard rule.enabled else { return nil }
+            var re: NSRegularExpression? = nil
+            var regexInvalid = false
+            if let pat = rule.regex, !pat.isEmpty {
+                let opts: NSRegularExpression.Options = rule.caseSensitive ? [] : [.caseInsensitive]
+                if let made = try? NSRegularExpression(pattern: pat, options: opts) {
+                    re = made
+                } else {
+                    regexInvalid = true
+                }
             }
-            // Invalid regex → silently treated as never-matching (UI validates earlier).
+            let inc = rule.caseSensitive ? rule.include : rule.include.map { $0.lowercased() }
+            let exc = rule.caseSensitive ? rule.exclude : rule.exclude.map { $0.lowercased() }
+            return CompiledRule(original: rule, regex: re, regexInvalid: regexInvalid,
+                                include: inc, exclude: exc)
         }
 
         var matches: [EngineMatch] = []
         matches.reserveCapacity(items.count)
 
         for item in items {
-            for rule in rules where rule.enabled {
-                if matchesRule(item.title, rule: rule, compiled: compiled[rule.id]) {
-                    matches.append(EngineMatch(itemGuid: item.guid, ruleId: rule.id, ruleName: rule.name))
-                    break   // one match per item
+            // Hoist the case-folded title once per item.
+            let titleFolded = item.title.lowercased()
+
+            for cr in compiledRules {
+                if cr.regex != nil || cr.regexInvalid {
+                    // Regex rules (or attempted-regex rules) skip keyword matching entirely.
+                    guard let re = cr.regex else { continue }
+                    let range = NSRange(item.title.startIndex..<item.title.endIndex, in: item.title)
+                    if re.firstMatch(in: item.title, options: [], range: range) != nil {
+                        matches.append(EngineMatch(itemGuid: item.guid, ruleId: cr.original.id, ruleName: cr.original.name))
+                        break
+                    }
+                    continue
                 }
+
+                // Keyword mode. range(of:options:.literal) avoids Unicode
+                // collation that String.contains does by default.
+                let hay = cr.original.caseSensitive ? item.title : titleFolded
+                if !cr.include.isEmpty {
+                    var ok = true
+                    for needle in cr.include where hay.range(of: needle, options: .literal) == nil {
+                        ok = false; break
+                    }
+                    if !ok { continue }
+                }
+                var rejected = false
+                for needle in cr.exclude where hay.range(of: needle, options: .literal) != nil {
+                    rejected = true; break
+                }
+                if rejected { continue }
+
+                matches.append(EngineMatch(itemGuid: item.guid, ruleId: cr.original.id, ruleName: cr.original.name))
+                break
             }
         }
         return matches
-    }
-
-    private static func matchesRule(_ title: String, rule: EngineRule, compiled: NSRegularExpression?) -> Bool {
-        // Regex mode wins if present
-        if let re = compiled {
-            let range = NSRange(title.startIndex..<title.endIndex, in: title)
-            return re.firstMatch(in: title, options: [], range: range) != nil
-        }
-        if rule.regex != nil { return false }   // regex set but invalid → never match
-
-        // Keyword mode
-        let hay = rule.caseSensitive ? title : title.lowercased()
-        let inc = rule.caseSensitive ? rule.include : rule.include.map { $0.lowercased() }
-        let exc = rule.caseSensitive ? rule.exclude : rule.exclude.map { $0.lowercased() }
-
-        // include[] is AND-all; empty list = no constraint
-        if !inc.isEmpty {
-            for needle in inc where !hay.contains(needle) { return false }
-        }
-        // exclude[] is "any match → reject"
-        for needle in exc where hay.contains(needle) { return false }
-        return true
     }
 }
