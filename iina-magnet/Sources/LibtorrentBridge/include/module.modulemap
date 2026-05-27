@@ -1,0 +1,5 @@
+module LibtorrentBridge {
+    umbrella header "LibtorrentBridge.h"
+    export *
+    module * { export * }
+}
