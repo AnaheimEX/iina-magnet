@@ -34,9 +34,12 @@ public enum IinaMagnetBootstrap {
         installMagnetMenu()
         presentDisclaimerIfNeeded()
 
-        // Phase 1: start TorrentManager (Issue 06) + SubscriptionScheduler (Issue 13).
+        // Phase 1: bring up the actor pipeline in dependency order.
+        // CompletionPipeline subscribes to TorrentManager.events; subscribe BEFORE
+        // any torrents can be added so we don't miss early finished events.
         Task {
             await TorrentManager.shared.start()
+            await CompletionPipeline.shared.start()
             await SubscriptionScheduler.shared.start()
         }
     }
@@ -51,6 +54,7 @@ public enum IinaMagnetBootstrap {
         let sema = DispatchSemaphore(value: 0)
         Task {
             await SubscriptionScheduler.shared.shutdown()
+            await CompletionPipeline.shared.shutdown()
             await TorrentManager.shared.shutdown()
             sema.signal()
         }
