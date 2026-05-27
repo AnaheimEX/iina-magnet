@@ -1,6 +1,6 @@
 # Issue 03 · iina 主菜单 Hook + Magnet 顶层菜单
 
-Status: in-progress (PR #3 open, stacked on PR #2)
+Status: ready-to-merge (PR #3 — full iina CI green via workflow_dispatch, awaiting human approval)
 Sprint: 0 (Foundation)
 Created: 2026-05-26
 Updated: 2026-05-26

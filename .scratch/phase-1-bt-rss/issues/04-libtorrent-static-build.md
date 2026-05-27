@@ -1,6 +1,6 @@
 # Issue 04 · libtorrent 静态库编译（universal arm64+x86_64）
 
-Status: ready-for-agent
+Status: ready-to-merge (PR #4 — local build verified: arm64 17MB + x86_64 18MB → universal 34MB; lipo -info confirms both architectures)
 Sprint: 1 (libtorrent 桥接)
 Created: 2026-05-26
 Updated: 2026-05-26

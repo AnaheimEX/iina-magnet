@@ -1,6 +1,6 @@
 # Issue 05 · LibtorrentBridge.mm（Obj-C++ wrapper）
 
-Status: ready-for-agent
+Status: in-progress (PR #5 open, stacked on PR #4; 14 tests pass locally)
 Sprint: 1 (libtorrent 桥接)
 Created: 2026-05-26
 Updated: 2026-05-26
