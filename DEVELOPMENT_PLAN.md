@@ -33,9 +33,9 @@
 
 | Phase | 范围 | 时长 | 状态 |
 | --- | --- | --- | --- |
-| Phase 0 | fork 建立、工程基线、CI、Disclaimer | 1 周 | 待启动 |
-| Phase 1 | BT/RSS 订阅 + 边看边播 + 字幕外挂 | 6-8 周 | 待启动 |
-| Phase 2 | 媒体库 + 元数据 + 档案页 + 资源扫描 | 6-8 周 | 计划中 |
+| Phase 0 | fork 建立、工程基线、CI、Disclaimer | 1 周 | ✅ 已完成 |
+| Phase 1 | BT/RSS 订阅 + 边看边播 + 字幕外挂 | 6-8 周 | ✅ 已完成（19 issues merged，`v0.1.0-phase1`） |
+| Phase 2 | 媒体库 + 元数据 + 档案页 + 资源扫描 | 6-8 周 | 🚧 进行中（PRD + 20 issues 已规划，见 [docs/phase-2/PRD.md](./docs/phase-2/PRD.md)） |
 | Phase 3+ | 待定（在线字幕、Whisper 字幕生成、Bilibili/弹幕、多设备同步） | TBD | 未规划 |
 
 ### 2.3 工程原则

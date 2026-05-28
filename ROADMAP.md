@@ -84,6 +84,8 @@
 
 ## Phase 2 · 媒体库 + 元数据 + 档案页（6-8 周）
 
+> Status: 🚧 进行中 · PRD 与 20 个实施 issue 已落地：[PRD](./docs/phase-2/PRD.md) · [issues](./.scratch/phase-2-library/issues/) · [ADR-0005](./docs/adr/0005-multi-source-metadata.md) · [ADR-0006](./docs/adr/0006-anitomy-bridge.md)
+
 **目标**：用户的本地视频（含 Phase 1 下载产物）自动入库、识别元数据、生成档案页、按三态分类浏览。
 
 ### Sprint 拆分
