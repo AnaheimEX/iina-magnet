@@ -67,6 +67,10 @@ public final class Title {
     @Relationship(deleteRule: .cascade, inverse: \WatchProgress.title)
     public var watchProgresses: [WatchProgress] = []
 
+    // Cast credits (声优 / 角色), cascade so re-match cleanup drops them.
+    @Relationship(deleteRule: .cascade, inverse: \Credit.title)
+    public var credits: [Credit] = []
+
     public var createdAt: Date
     public var updatedAt: Date
 

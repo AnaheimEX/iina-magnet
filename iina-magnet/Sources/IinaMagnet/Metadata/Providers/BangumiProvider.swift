@@ -66,6 +66,18 @@ public struct BangumiProvider: MetadataProvider {
 
         let (genres, countries) = Self.classifyTags(subject.meta_tags ?? [])
 
+        // Cast (声优 / 角色) — best-effort; absent for many subjects.
+        var cast: [MetadataCast] = []
+        if let charURL = URL(string: "\(host)/v0/subjects/\(externalId)/characters"),
+           let charData = try? await client.getJSON(charURL),
+           let chars = try? JSONDecoder().decode([Character].self, from: charData) {
+            cast = chars.compactMap { c in
+                guard let actor = c.actors?.first?.name?.nonEmpty else { return nil }
+                return MetadataCast(actor: actor, character: c.name?.nonEmpty)
+            }
+            if cast.count > 12 { cast = Array(cast.prefix(12)) }
+        }
+
         return MetadataDetails(providerId: .bangumi,
                                externalId: externalId,
                                titleZh: subject.name_cn?.nonEmpty,
@@ -77,6 +89,7 @@ public struct BangumiProvider: MetadataProvider {
                                rating: subject.rating?.score,
                                genres: genres,
                                countries: countries,
+                               cast: cast,
                                episodes: episodes)
     }
 
@@ -135,6 +148,11 @@ public struct BangumiProvider: MetadataProvider {
         let meta_tags: [String]?
     }
     private struct Rating: Decodable { let score: Double? }
+    private struct Character: Decodable {
+        let name: String?            // 角色名
+        let actors: [Actor]?
+        struct Actor: Decodable { let name: String? }   // 声优
+    }
     private struct Images: Decodable { let large: String? }
     private struct EpisodeResponse: Decodable { let data: [Ep] }
     private struct Ep: Decodable {

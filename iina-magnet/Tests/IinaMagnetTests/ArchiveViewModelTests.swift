@@ -57,6 +57,20 @@ struct ArchiveViewModelTests {
         #expect(vm.bestQuality == "1080p")
     }
 
+    @Test("cast credits map to ordered CastMember list")
+    func cast() throws {
+        let ctx = makeContext()
+        let t = Title(kind: .tv, titleZh: "葬送的芙莉莲", matchState: .confirmed)
+        let c0 = Credit(actorName: "种崎敦美", characterName: "芙莉莲", order: 0)
+        let c1 = Credit(actorName: "市之濑加那", characterName: "费伦", order: 1)
+        for c in [c1, c0] { c.title = t; t.credits.append(c) }   // inserted out of order
+        ctx.insert(t); ctx.insert(c0); ctx.insert(c1)
+
+        let vm = ArchiveViewModel(t)
+        #expect(vm.cast.map(\.name) == ["种崎敦美", "市之濑加那"])   // sorted by order
+        #expect(vm.cast.first?.role == "芙莉莲")
+    }
+
     @Test("movie: versions surfaced directly, no season grid, runtime kept")
     func movieVariant() throws {
         let ctx = makeContext()

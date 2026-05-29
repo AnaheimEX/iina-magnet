@@ -40,6 +40,7 @@ public struct Ingester {
         let title = try findOrCreateTitle(parsed: parsed, details: details)
         apply(details: details, resolution: resolution, to: title, parsed: parsed)
         try applyTags(to: title, details: details, parsed: parsed)
+        CreditApplier.apply(details?.cast ?? [], to: title, context: context)
 
         // 3. Season + Episode (movies use placeholder season0/ep0).
         let isMovie = title.kind == .movie

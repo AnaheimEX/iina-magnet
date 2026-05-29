@@ -85,6 +85,33 @@ struct LibraryEditorTests {
         #expect(t.tags.contains { $0.name == "2023" && $0.category == .year })
     }
 
+    @Test("re-match replaces cast; a cast-less source leaves existing cast intact")
+    func rematchCast() throws {
+        let ctx = makeContext()
+        let t = Title(kind: .tv, titleZh: "番", matchState: .pendingConfirmation)
+        ctx.insert(t)
+
+        // First re-match brings cast.
+        let withCast = MetadataDetails(providerId: .bangumi, externalId: "1",
+                                       cast: [.init(actor: "种崎敦美", character: "芙莉莲")])
+        try LibraryEditor(context: ctx).applyRematch(withCast, to: t)
+        #expect(t.credits.count == 1)
+        #expect(t.credits.first?.actorName == "种崎敦美")
+
+        // A later re-match to a cast-less source must not wipe the existing cast.
+        let noCast = MetadataDetails(providerId: .bangumi, externalId: "2")
+        try LibraryEditor(context: ctx).applyRematch(noCast, to: t)
+        #expect(t.credits.count == 1)
+
+        // A re-match with new cast replaces (no duplicates).
+        let newCast = MetadataDetails(providerId: .bangumi, externalId: "3",
+                                      cast: [.init(actor: "A", character: "a"),
+                                             .init(actor: "B", character: "b")])
+        try LibraryEditor(context: ctx).applyRematch(newCast, to: t)
+        #expect(t.credits.count == 2)
+        #expect(Set(t.credits.map(\.actorName)) == ["A", "B"])
+    }
+
     @Test("re-match does not clobber existing fields with nil from the new source")
     func rematchKeepsExisting() throws {
         let ctx = makeContext()

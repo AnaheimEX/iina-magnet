@@ -52,6 +52,7 @@ public final class PersistenceController {
             Tag.self,
             WatchProgress.self,
             MetadataCache.self,
+            Credit.self,
         ])
 
         do {

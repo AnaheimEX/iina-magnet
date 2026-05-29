@@ -57,6 +57,15 @@ public struct MetadataEpisode: Codable, Sendable, Equatable {
     }
 }
 
+public struct MetadataCast: Codable, Sendable, Equatable {
+    public var actor: String        // 声优
+    public var character: String?   // 角色
+    public init(actor: String, character: String? = nil) {
+        self.actor = actor
+        self.character = character
+    }
+}
+
 public struct MetadataDetails: Codable, Sendable, Equatable {
     public var providerId: ProviderID
     public var externalId: String
@@ -70,12 +79,14 @@ public struct MetadataDetails: Codable, Sendable, Equatable {
     public var runtimeMinutes: Int?
     public var genres: [String]      // 题材标签（奇幻 / 日常 / 治愈…）
     public var countries: [String]   // 制作地区（日本 / 中国…）
+    public var cast: [MetadataCast]  // 演职员（声优 / 角色）
     public var episodes: [MetadataEpisode]
     public init(providerId: ProviderID, externalId: String,
                 titleZh: String? = nil, titleJa: String? = nil, titleEn: String? = nil,
                 overview: String? = nil, posterURL: URL? = nil, releaseYear: Int? = nil,
                 rating: Double? = nil, runtimeMinutes: Int? = nil,
                 genres: [String] = [], countries: [String] = [],
+                cast: [MetadataCast] = [],
                 episodes: [MetadataEpisode] = []) {
         self.providerId = providerId
         self.externalId = externalId
@@ -89,6 +100,7 @@ public struct MetadataDetails: Codable, Sendable, Equatable {
         self.runtimeMinutes = runtimeMinutes
         self.genres = genres
         self.countries = countries
+        self.cast = cast
         self.episodes = episodes
     }
 }

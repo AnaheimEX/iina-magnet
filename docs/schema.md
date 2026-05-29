@@ -25,6 +25,7 @@
 | `Episode` | number, seasonNumber(冗余), title?(zh), titleOriginal?(ja/en), airDate?, overview?, thumbnailURL? | inverse → season；`versions` 1-N cascade |
 | `VersionFile` | fileURL, bookmark?, fileSizeBytes, fileFingerprint(unique), resolution?, releaseGroup?, languages[], isMissing | inverse → episode |
 | `Tag` | name, categoryRaw | `titles` N-N（inverse of Title.tags） |
+| `Credit` | actorName(声优), characterName?(角色), order | inverse → title；Title.credits 1-N cascade（Bangumi characters） |
 | `WatchProgress` | seasonNumber?, episodeNumber?, lastPositionSec, durationSec, stateRaw, updatedAt | `title` 关系（不存 PersistentIdentifier）；键 (title, season, episode) 跨版本共享 |
 | `MetadataCache` | cacheKey(unique)=`"<provider>\|<externalId>\|<locale>"`, payload(Data), fetchedAt | 24h TTL（Issue 05 写读） |
 

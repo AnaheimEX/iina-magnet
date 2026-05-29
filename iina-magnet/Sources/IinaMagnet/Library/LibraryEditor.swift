@@ -87,6 +87,7 @@ public struct LibraryEditor {
                                         resolution: nil, releaseGroup: nil,
                                         genres: details.genres, countries: details.countries)
         try TagApplier.apply(derived, to: title, context: context)
+        CreditApplier.apply(details.cast, to: title, context: context)
         try context.save()
     }
 }
