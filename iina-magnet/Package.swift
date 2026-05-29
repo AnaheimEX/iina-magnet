@@ -31,6 +31,7 @@ let package = Package(
     products: [
         .library(name: "IinaMagnet",       targets: ["IinaMagnet"]),
         .library(name: "LibtorrentBridge", targets: ["LibtorrentBridge"]),
+        .library(name: "AnitomyBridge",    targets: ["AnitomyBridge"]),
     ],
     targets: [
         // MARK: Obj-C++ wrapper around libtorrent 2.0.x (Issue 05).
@@ -72,10 +73,25 @@ let package = Package(
             ]
         ),
 
+        // MARK: Obj-C++ wrapper around the vendored classic Anitomy (Phase 2 Issue 02).
+        //
+        // Anitomy C++14 sources live under Sources/AnitomyBridge/anitomy/ and are
+        // compiled as part of this target (header-search path "." resolves the
+        // "anitomy/foo.h" includes). See lib/anitomy/README.md + ADR-0006.
+        .target(
+            name: "AnitomyBridge",
+            path: "Sources/AnitomyBridge",
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .headerSearchPath("."),
+            ]
+        ),
+
         .target(
             name: "IinaMagnet",
             dependencies: [
                 "LibtorrentBridge",
+                "AnitomyBridge",
             ],
             path: "Sources/IinaMagnet",
             resources: [
@@ -93,6 +109,12 @@ let package = Package(
             name: "LibtorrentBridgeTests",
             dependencies: ["LibtorrentBridge"],
             path: "Tests/LibtorrentBridgeTests"
+        ),
+
+        .testTarget(
+            name: "AnitomyBridgeTests",
+            dependencies: ["AnitomyBridge"],
+            path: "Tests/AnitomyBridgeTests"
         ),
     ],
     cxxLanguageStandard: .cxx17
