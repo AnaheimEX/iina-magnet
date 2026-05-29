@@ -39,6 +39,7 @@ public struct Ingester {
         // 2. Find or create the Title.
         let title = try findOrCreateTitle(parsed: parsed, details: details)
         apply(details: details, resolution: resolution, to: title, parsed: parsed)
+        try applyTags(to: title, details: details, parsed: parsed)
 
         // 3. Season + Episode (movies use placeholder season0/ep0).
         let isMovie = title.kind == .movie
@@ -109,6 +110,31 @@ public struct Ingester {
         title.releaseYear = details.releaseYear ?? title.releaseYear ?? parsed.year
         title.matchState = resolution?.state ?? title.matchState
         title.matchScore = resolution?.score ?? title.matchScore
+    }
+
+    // MARK: - Tags
+
+    private func applyTags(to title: Title, details: MetadataDetails?, parsed: ParsedMedia) throws {
+        let derived = TagDeriver.derive(year: details?.releaseYear ?? title.releaseYear ?? parsed.year,
+                                        rating: details?.rating,
+                                        resolution: parsed.resolution,
+                                        releaseGroup: parsed.releaseGroup)
+        for d in derived {
+            let tag = try findOrCreateTag(name: d.name, category: d.category)
+            if !title.tags.contains(where: { $0.name == tag.name && $0.category == tag.category }) {
+                title.tags.append(tag)
+            }
+        }
+    }
+
+    private func findOrCreateTag(name: String, category: TagCategory) throws -> Tag {
+        let catRaw = category.rawValue
+        var d = FetchDescriptor<Tag>(predicate: #Predicate { $0.name == name && $0.categoryRaw == catRaw })
+        d.fetchLimit = 1
+        if let found = try context.fetch(d).first { return found }
+        let t = Tag(name: name, category: category)
+        context.insert(t)
+        return t
     }
 
     // MARK: - Season / Episode
