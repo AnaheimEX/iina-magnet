@@ -1,6 +1,6 @@
 # Issue 01 · 媒体库 SwiftData schema
 
-Status: ready-for-agent
+Status: completed (implemented on branch phase2/01-library-schema)
 Sprint: 1 (Schema + Scanner)
 Created: 2026-05-29
 Updated: 2026-05-29
@@ -42,3 +42,12 @@ Blocks: 04, 11, 12, 13, 15, 16, 17
 - 元数据类型 MetadataDetails 的具体字段（→ Issue 05）
 
 ## Comments
+
+### 2026-05-29 claude
+实现完成。要点 / 与 issue 的偏差：
+- 枚举存 `*Raw: Int` + 计算属性（沿用 `TorrentTaskStatus` 约定），非直接存 Codable enum。
+- 复合索引（`Title.kind`、`WatchProgress` 三键）**未加**：部署目标 macOS 14，`#Index` 宏需 macOS 15。唯一约束用 `@Attribute(.unique)`（fileFingerprint / cacheKey），其余走内存过滤 / `#Predicate`。已在 `docs/schema.md` 注明，待最低系统升 15 再补。
+- `WatchProgress` 不存 `PersistentIdentifier`（SwiftData 拒绝裸 PersistentIdentifier，同 FeedItem 教训），改用 `@Relationship var title: Title?` + `seasonNumber/episodeNumber`，仍满足跨版本共享进度。
+- 新增 `Title.aggregateStateRaw`（PRD §IM-4 未列）：缓存派生三态，供 Issue 16/17 复用，避免后续迁移。
+- 测试用 `ModelContext(container)` 而非 `.mainContext`：本机 CLI swift-testing 工具链（macOS 26 beta）在 `.mainContext` save 处 trap，与 schema 无关；`ModelContext` 是 Phase 1 既有的逐用例隔离写法。
+- 全套 58 tests / 11 suites 通过（新增 7 个 LibrarySchema 用例）。
