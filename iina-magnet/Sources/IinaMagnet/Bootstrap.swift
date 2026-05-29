@@ -83,11 +83,9 @@ public enum IinaMagnetBootstrap {
         submenu.addItem(menuItem(title: "BT Manager…",
                                  action: #selector(MagnetMenuActions.showBtManager(_:)),
                                  keyEquivalent: "b", modifiers: [.command, .shift]))
-        let libraryItem = menuItem(title: "Library…",
-                                   action: #selector(MagnetMenuActions.showLibrary(_:)),
-                                   keyEquivalent: "l", modifiers: [.command, .shift])
-        libraryItem.isEnabled = false   // Phase 2 enables
-        submenu.addItem(libraryItem)
+        submenu.addItem(menuItem(title: "Library…",
+                                 action: #selector(MagnetMenuActions.showLibrary(_:)),
+                                 keyEquivalent: "l", modifiers: [.command, .shift]))
         submenu.addItem(.separator())
         submenu.addItem(menuItem(title: "Settings…",
                                  action: #selector(MagnetMenuActions.showSettings(_:)),
@@ -170,7 +168,13 @@ final class MagnetMenuActions: NSObject {
         }
     }
 
-    @objc func showLibrary(_ sender: Any?)  { placeholder(name: "Library (Phase 2)") }
+    @objc func showLibrary(_ sender: Any?) {
+        WindowFactory.shared.open(.library, title: "Library",
+                                  contentSize: .init(width: 1100, height: 720)) {
+            LibraryWindowView()
+                .modelContainer(PersistenceController.shared.container)
+        }
+    }
 
     @objc func showSettings(_ sender: Any?) {
         WindowFactory.shared.open(.settings, title: "Settings",
