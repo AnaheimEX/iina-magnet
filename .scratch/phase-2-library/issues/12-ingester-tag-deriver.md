@@ -1,6 +1,6 @@
 # Issue 12 · Ingester + TagDeriver（扫描→元数据→入库 串联）
 
-Status: partial — Ingester 已合并 develop（按 fingerprint 幂等 upsert 进 Title/Season/Episode/VersionFile，应用单源元数据；unmatched 也可见）。待补：TagDeriver 深模块（自动标签）、并发受限批量入库、多源 merge 接入（依赖 Issue 10）。
+Status: partial — Ingester + TagDeriver + IngestCoordinator 已合并 develop（幂等 upsert；TagDeriver 自动标签 year/ratingBucket/quality/releaseGroup；IngestCoordinator 串起 scan→resolve→ingest，可供 UI/Issue 20 复用）。待补：genre/country 标签（依赖多源 TMDB 干净数据）、并发受限批量入库（≤4）、MetadataCache 接入、多源 merge（依赖 Issue 10）。
 Sprint: 2 (Metadata)
 Created: 2026-05-29
 Updated: 2026-05-29
