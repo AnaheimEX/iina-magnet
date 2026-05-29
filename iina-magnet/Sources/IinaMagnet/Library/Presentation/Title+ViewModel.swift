@@ -22,7 +22,7 @@ extension LibraryItemViewModel {
             ?? "未命名"
         self.titleOriginal = title.titleJa ?? title.titleEn
         self.year = title.releaseYear
-        self.ratings = LibraryItemViewModel.ratings(of: title)
+        self.ratings = TitleDerivations.ratings(of: title)
         self.aggregateState = title.aggregateState
         self.matchState = title.matchState
         self.runtimeMinutes = title.runtimeMinutes
@@ -39,57 +39,12 @@ extension LibraryItemViewModel {
             .flatMap(\.episodes)
             .map(\.versions.count)
             .max() ?? 0
-        self.topQuality = LibraryItemViewModel.topQuality(of: present)
+        self.topQuality = TitleDerivations.topQuality(of: present)
         self.rawName = title.kind == .unknown
             ? present.first?.fileURL.lastPathComponent
             : nil
 
         self.addedAt = title.createdAt
-        self.resume = LibraryItemViewModel.resume(of: title)
-    }
-
-    // MARK: - Derivations
-
-    private static func ratings(of title: Title) -> [RatingBadge] {
-        var out: [RatingBadge] = []
-        if let r = title.bangumiRating { out.append(.init(source: .bangumi, value: r)) }
-        if let r = title.tmdbRating    { out.append(.init(source: .tmdb,    value: r)) }
-        if let r = title.doubanRating  { out.append(.init(source: .douban,  value: r)) }
-        return out
-    }
-
-    /// Highest available resolution among present files, by pixel height.
-    private static func topQuality(of versions: [VersionFile]) -> String? {
-        versions
-            .compactMap(\.resolution)
-            .max { qualityRank($0) < qualityRank($1) }
-    }
-
-    /// Orders resolution strings by pixel height ("2160p" > "1080p" > "720p").
-    /// The pipeline normalizes to "<height>p", but `resolution` is free-form, so
-    /// map the common non-pixel marketing tokens (4K/UHD/2K) rather than ranking
-    /// them at 0 (which would sort a 4K file below 1080p).
-    private static func qualityRank(_ s: String) -> Int {
-        let lower = s.lowercased()
-        if lower.contains("4k") || lower.contains("uhd") { return 2160 }
-        if lower.contains("2k") { return 1440 }
-        let digits = lower.drop { !$0.isNumber }.prefix { $0.isNumber }
-        return Int(digits) ?? 0
-    }
-
-    private static func resume(of title: Title) -> ResumeInfo? {
-        // Most recently touched in-progress episode drives the resume affordance.
-        guard let wp = title.watchProgresses
-            .filter({ $0.state == .inProgress })
-            .max(by: { $0.updatedAt < $1.updatedAt })
-        else { return nil }
-
-        return ResumeInfo(
-            episodeNumber: wp.episodeNumber.flatMap { $0 > 0 ? $0 : nil },
-            label: LibraryFormatting.resumeLabel(episodeNumber: wp.episodeNumber,
-                                                 positionSec: wp.lastPositionSec,
-                                                 durationSec: wp.durationSec),
-            progress: LibraryFormatting.progress(positionSec: wp.lastPositionSec,
-                                                 durationSec: wp.durationSec))
+        self.resume = TitleDerivations.resume(of: title)
     }
 }
