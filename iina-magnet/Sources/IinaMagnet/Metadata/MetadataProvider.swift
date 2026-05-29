@@ -43,12 +43,15 @@ public struct MetadataCandidate: Sendable, Equatable {
 
 public struct MetadataEpisode: Codable, Sendable, Equatable {
     public var number: Int
-    public var title: String?
+    public var title: String?           // localized (zh) title
+    public var titleOriginal: String?   // original-language (ja/en) title
     public var overview: String?
     public var airDate: Date?
-    public init(number: Int, title: String? = nil, overview: String? = nil, airDate: Date? = nil) {
+    public init(number: Int, title: String? = nil, titleOriginal: String? = nil,
+                overview: String? = nil, airDate: Date? = nil) {
         self.number = number
         self.title = title
+        self.titleOriginal = titleOriginal
         self.overview = overview
         self.airDate = airDate
     }
@@ -64,11 +67,13 @@ public struct MetadataDetails: Codable, Sendable, Equatable {
     public var posterURL: URL?
     public var releaseYear: Int?
     public var rating: Double?
+    public var runtimeMinutes: Int?
     public var episodes: [MetadataEpisode]
     public init(providerId: ProviderID, externalId: String,
                 titleZh: String? = nil, titleJa: String? = nil, titleEn: String? = nil,
                 overview: String? = nil, posterURL: URL? = nil, releaseYear: Int? = nil,
-                rating: Double? = nil, episodes: [MetadataEpisode] = []) {
+                rating: Double? = nil, runtimeMinutes: Int? = nil,
+                episodes: [MetadataEpisode] = []) {
         self.providerId = providerId
         self.externalId = externalId
         self.titleZh = titleZh
@@ -78,6 +83,7 @@ public struct MetadataDetails: Codable, Sendable, Equatable {
         self.posterURL = posterURL
         self.releaseYear = releaseYear
         self.rating = rating
+        self.runtimeMinutes = runtimeMinutes
         self.episodes = episodes
     }
 }

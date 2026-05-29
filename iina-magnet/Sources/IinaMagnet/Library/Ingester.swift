@@ -49,6 +49,7 @@ public struct Ingester {
         let episode = self.episode(number: episodeNo, seasonNumber: seasonNo, in: season)
         if let meta = details?.episodes.first(where: { $0.number == episodeNo }) {
             episode.title = meta.title ?? episode.title
+            episode.titleOriginal = meta.titleOriginal ?? episode.titleOriginal
             episode.overview = meta.overview ?? episode.overview
             episode.airDate = meta.airDate ?? episode.airDate
         }
@@ -108,6 +109,19 @@ public struct Ingester {
         title.overview = details.overview ?? title.overview
         title.posterURL = details.posterURL ?? title.posterURL
         title.releaseYear = details.releaseYear ?? title.releaseYear ?? parsed.year
+        title.runtimeMinutes = details.runtimeMinutes ?? title.runtimeMinutes
+        // Store the rating under its source's scalar so the UI can badge provenance.
+        if let rating = details.rating {
+            switch details.providerId {
+            case .bangumi: title.bangumiRating = rating
+            case .tmdb:    title.tmdbRating = rating
+            case .douban:  title.doubanRating = rating
+            // bangumi/tmdb/douban all use a 0–10 scale. Anilist scores 0–100 and
+            // has no scalar on Title yet — when it's added, normalize to 0–10 here
+            // (and before passing to TagDeriver) rather than storing the raw score.
+            case .anilist: break
+            }
+        }
         title.matchState = resolution?.state ?? title.matchState
         title.matchScore = resolution?.score ?? title.matchScore
     }

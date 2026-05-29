@@ -137,8 +137,8 @@ struct MetadataTests {
                           titleZh: "葬送的芙莉莲", titleJa: "葬送のフリーレン",
                           overview: "勇者一行打倒了魔王。",
                           posterURL: URL(string: "https://lain.bgm.tv/pic/459283.jpg"),
-                          releaseYear: 2023, rating: 6.8,
-                          episodes: [.init(number: 1, title: "魔法のレシピ")]))
+                          releaseYear: 2023, rating: 6.8, runtimeMinutes: 24,
+                          episodes: [.init(number: 1, title: "第一集", titleOriginal: "魔法のレシピ")]))
         let resolution = await MetadataService(provider: fake).resolve(file.parsed)
         #expect(resolution.state == .confirmed)
 
@@ -153,12 +153,16 @@ struct MetadataTests {
         #expect(title.matchState == .confirmed)
         #expect(title.posterURL != nil)
         #expect(title.releaseYear == 2023)
+        #expect(title.bangumiRating == 6.8)        // rating stored under its source scalar
+        #expect(title.tmdbRating == nil)
+        #expect(title.runtimeMinutes == 24)
 
         let season = try #require(title.seasons.first)
         #expect(season.number == 1)
         let ep = try #require(season.episodes.first)
         #expect(ep.number == 1)
-        #expect(ep.title == "魔法のレシピ")
+        #expect(ep.title == "第一集")
+        #expect(ep.titleOriginal == "魔法のレシピ")
         let version = try #require(ep.versions.first)
         #expect(version.resolution == "1080p")
         #expect(version.releaseGroup == "喵萌奶茶屋")

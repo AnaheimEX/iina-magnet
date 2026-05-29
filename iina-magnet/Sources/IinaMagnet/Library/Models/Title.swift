@@ -33,9 +33,17 @@ public final class Title {
     public var backdropURL: URL?
     public var releaseYear: Int?
 
-    // Ratings kept separately so the UI can show both (ADR-0005).
+    // Ratings kept separately so the UI can show each source side-by-side with
+    // its provenance badge (ADR-0005; design's dual/triple RatingBadges). Bangumi
+    // is the primary source for anime, so it gets its own scalar rather than being
+    // collapsed into a single rating.
+    public var bangumiRating: Double?
     public var tmdbRating: Double?
     public var doubanRating: Double?
+
+    /// Movie runtime in minutes (nil for TV / unknown). Shown in the archive
+    /// page's meta row for movies.
+    public var runtimeMinutes: Int?
 
     public var matchStateRaw: Int            // MatchState.rawValue
     public var matchScore: Double            // similarity score that produced the match
