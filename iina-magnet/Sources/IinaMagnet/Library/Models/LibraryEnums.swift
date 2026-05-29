@@ -16,6 +16,15 @@ public enum MediaKind: Int, Codable, Sendable, CaseIterable {
     case tv      = 0   // 剧集 / 番剧（有季 / 集）
     case movie   = 1   // 电影（占位 season0/ep0）
     case unknown = 2   // 未识别，进待确认队列
+
+    /// Canonical zh label, shared by every UI surface (sidebar / stats / badges).
+    public var displayLabel: String {
+        switch self {
+        case .tv: return "番剧"
+        case .movie: return "电影"
+        case .unknown: return "未识别"
+        }
+    }
 }
 
 /// How confident the metadata match is (PRD §IM-7).
@@ -23,6 +32,14 @@ public enum MatchState: Int, Codable, Sendable {
     case confirmed           = 0   // score ≥ 0.85，自动入库
     case pendingConfirmation = 1   // 0.65 ≤ score < 0.85，入库但待确认
     case unmatched           = 2   // score < 0.65，进待确认队列
+
+    public var displayLabel: String {
+        switch self {
+        case .confirmed: return "已确认"
+        case .pendingConfirmation: return "待确认"
+        case .unmatched: return "未匹配"
+        }
+    }
 }
 
 /// Category of a `Tag` (ADR-0005 tags; mix of auto-derived and user-defined).
@@ -41,4 +58,12 @@ public enum ProgressState: Int, Codable, Sendable {
     case unseen     = 0
     case inProgress = 1
     case completed  = 2
+
+    public var displayLabel: String {
+        switch self {
+        case .unseen: return "未看"
+        case .inProgress: return "在看"
+        case .completed: return "已看"
+        }
+    }
 }

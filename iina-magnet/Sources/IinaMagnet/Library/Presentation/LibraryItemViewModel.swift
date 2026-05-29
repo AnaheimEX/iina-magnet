@@ -37,6 +37,16 @@ public struct RatingBadge: Equatable, Sendable {
     }
 }
 
+/// A tag name + its category, so the sidebar can group tags (类型 / 地区 / …).
+public struct TagRef: Equatable, Hashable, Sendable {
+    public let name: String
+    public let category: TagCategory
+    public init(name: String, category: TagCategory) {
+        self.name = name
+        self.category = category
+    }
+}
+
 /// "Continue watching" affordance, present only when a title is in progress.
 public struct ResumeInfo: Equatable, Sendable {
     public let episodeNumber: Int?     // nil for movies (whole-film progress)
@@ -62,12 +72,17 @@ public struct LibraryItemViewModel: Identifiable, Equatable, Sendable {
     public let resume: ResumeInfo?
     public let runtimeMinutes: Int?
     public let posterURL: URL?
-    public let tagNames: [String]
+    public let tags: [TagRef]
+    public var tagNames: [String] { tags.map(\.name) }
     public let versionCount: Int       // max versions across episodes (tv) or count (movie)
     public let topQuality: String?     // best available (non-missing) resolution
     public let fileCount: Int          // total version files on disk
     public let totalSizeBytes: Int64
     public let rawName: String?        // original file name, for unmatched items
+    public let addedAt: Date           // Title.createdAt, drives 最近添加 sort/section
+
+    /// Highest rating across sources, for the 评分 sort. Zero when unrated.
+    public var maxRating: Double { ratings.map(\.value).max() ?? 0 }
 
     /// Caption shown beneath the poster: unmatched → file summary, else 原名 · 年份.
     public var caption: String {
