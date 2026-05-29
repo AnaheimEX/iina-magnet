@@ -1,6 +1,6 @@
 # Issue 04 · LibraryService 扫描器（全量 + FSEvents 增量）
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 1 (Schema + Scanner)
 Created: 2026-05-29
 Updated: 2026-05-29
@@ -41,3 +41,12 @@ Blocks: 12, 19
 - 扫描进度 UI（→ Issue 19）
 
 ## Comments
+
+### 2026-05-29 claude
+完成并合并（收尾 Sprint 1）。要点 / 与 issue 的取舍：
+- `LibraryService` actor：scan roots 管理 + `fullScan() -> AsyncStream<ScanProgress>`，扫描在 `Task.detached` 上跑（不阻塞 actor），靠 stream teardown 取消。
+- `ScannedFile`：url / fileFingerprint(`dev:ino:size` via `stat`) / sizeBytes / parsed。
+- **去重/缺失对账与 DB 解耦**：本 issue 不写 SwiftData。提供纯函数 `reconcile(known:seen:) -> (new, missing)`，DB 比对（标 isMissing/幂等 upsert）留给 Ingester（Issue 12）。这样 Scanner 保持可纯测、与持久化解耦。
+- FSEvents：`FSEventsWatcher` + 纯 `ChangeCoalescer`（路径→受影响目录折叠，已单测）。**code-review 修复**：原本在 FSEvents `latency` 之外又加了一层 `asyncAfter` 防抖 → 双重防抖，已移除，按 FSEvents 批次直接 flush。`deinit` 调 `stop()` 兜底生命周期。
+- FSEvents 实时回调在 CLI 下难做确定性单测，故只单测 ChangeCoalescer 折叠逻辑（实时流为薄封装）——符合 issue 验收里「防抖：事件折叠」的可测要求。
+- 7 个扫描器测试；全套 82 tests / 14 suites 通过。
