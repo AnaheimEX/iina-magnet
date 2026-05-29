@@ -62,6 +62,20 @@ struct PerformanceTests {
         #expect(plans.count == 100)
         #expect(elapsedMs < 200, "SubtitleExtractor 100 videos × 100 subs took \(elapsedMs)ms; budget 200ms")
     }
+
+    @Test("FilenameParser: 1000 parses under 100ms")
+    func filenameParserPerformance() {
+        let names = (0..<1000).map { i in
+            "[喵萌奶茶屋][葬送的芙莉莲][\(String(format: "%02d", i % 24 + 1))][1080p][简日双语].mkv"
+        }
+        // Warm — Anitomy keyword tables / regex compile.
+        _ = names.map { FilenameParser.parse($0) }
+
+        let t0 = Date()
+        for n in names { _ = FilenameParser.parse(n) }
+        let elapsedMs = Date().timeIntervalSince(t0) * 1000
+        #expect(elapsedMs < 100, "FilenameParser 1000 parses took \(elapsedMs)ms; budget 100ms")
+    }
 }
 
 private final class SyntheticFS: FileSystemAccessor, @unchecked Sendable {
