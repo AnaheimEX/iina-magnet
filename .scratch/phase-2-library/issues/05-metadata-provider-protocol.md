@@ -1,6 +1,6 @@
 # Issue 05 · MetadataProvider 协议 + Registry + Cache + 限流
 
-Status: ready-for-agent
+Status: partial — MVP 子集已合并 develop（MetadataProvider 协议 + 类型 + GET-only MetadataHTTPClient）。待补：ProviderRegistry（按 kindHint 排序）、MetadataCache 存储（24h TTL）、各源 RateLimiter。
 Sprint: 2 (Metadata)
 Created: 2026-05-29
 Updated: 2026-05-29

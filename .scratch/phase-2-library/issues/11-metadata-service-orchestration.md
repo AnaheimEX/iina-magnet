@@ -1,6 +1,6 @@
 # Issue 11 · MetadataService 编排（并发查询 + 超时 + 失败隔离）
 
-Status: ready-for-agent
+Status: partial — 单源 MVP 已合并 develop（MetadataService.resolve：单 provider search → 轻量 title/year 打分选最佳 → details → confirmed/pending/unmatched 分流）。待补：多 provider 并发（async let / TaskGroup）、单源 3s + 总 5s 超时、失败隔离、缓存优先、跨源选 externalId。
 Sprint: 2 (Metadata)
 Created: 2026-05-29
 Updated: 2026-05-29

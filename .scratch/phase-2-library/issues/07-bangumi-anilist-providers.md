@@ -1,6 +1,6 @@
 # Issue 07 · BangumiProvider + AnilistProvider
 
-Status: ready-for-agent
+Status: partial — BangumiProvider 已合并 develop（官方 API 匿名、search + /v0/subjects + /v0/episodes，含斜杠编码修复 + fixture 测试）。待补：AnilistProvider（GraphQL）；BangumiProvider 的 access-token 可选增强。
 Sprint: 2 (Metadata)
 Created: 2026-05-29
 Updated: 2026-05-29

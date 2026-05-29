@@ -85,6 +85,8 @@
 ## Phase 2 · 媒体库 + 元数据 + 档案页（6-8 周）
 
 > Status: 🚧 进行中 · PRD 与 20 个实施 issue 已落地：[PRD](./docs/phase-2/PRD.md) · [issues](./.scratch/phase-2-library/issues/) · [ADR-0005](./docs/adr/0005-multi-source-metadata.md) · [ADR-0006](./docs/adr/0006-anitomy-bridge.md)
+>
+> 进度（合并到 develop）：**Sprint 1 完成**（01 schema / 02 Anitomy 桥接 / 03 FilenameParser / 04 扫描器+FSEvents）。**元数据 MVP 完成**——按"先单源跑通全链路"决策，用 Bangumi 官方 API（免 key）打通「扫描→拉元数据→入库」，Issues 05/07/11/12 各完成 MVP 子集（详见各 issue Status）。已对真实 Bangumi API 验证。剩余多源（TMDB/Anilist/豆瓣）、MetadataMerger、TagDeriver、档案页 UI 等按 issue 续做。
 
 **目标**：用户的本地视频（含 Phase 1 下载产物）自动入库、识别元数据、生成档案页、按三态分类浏览。
 
