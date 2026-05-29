@@ -58,6 +58,7 @@ public struct BangumiProvider: MetadataProvider {
             episodes = epResp.data.map { e in
                 MetadataEpisode(number: Int(e.sort ?? Double(e.ep ?? 0)) ,
                                 title: e.name_cn?.nonEmpty ?? e.name?.nonEmpty,
+                                titleOriginal: e.name?.nonEmpty,
                                 overview: nil,
                                 airDate: date(from: e.airdate))
             }
