@@ -1,6 +1,6 @@
 # Issue 02 · Anitomy 桥接（vendored + Obj-C++ target）
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 1 (Schema + Scanner)
 Created: 2026-05-29
 Updated: 2026-05-29
@@ -40,3 +40,10 @@ Blocks: 03
 - Swift 侧映射与 regex fallback（→ Issue 03）
 
 ## Comments
+
+### 2026-05-29 claude
+完成并合并。与 issue/ADR 的偏差与发现：
+- 用的是**经典 Anitomy**（master @`a538eff`，C++14，`string_t = std::wstring`，MPL-2.0），不是当前默认分支的 C++23 重写版。重写版需 C++23 + `<ranges>`/`<format>`，在 Obj-C++/Apple clang 里编译风险高，且其 element 名（`ElementKind::Title`）与 ADR-0006 假设的 `anime_title`/`episode_number` 不一致。经典版正好匹配 ADR。
+- 源码放 `Sources/AnitomyBridge/anitomy/`，随 target 编译（`.headerSearchPath(".")`）；全局 cxx17 下编译干净，无需单独 build.sh。
+- 转换用 `NSUTF32LittleEndianStringEncoding`（不带 BOM 的 LE 变体）；CJK 往返无损。
+- **重要发现（影响 Issue 03）**：经典 Anitomy 对 `[组][CJK标题][NN][1080p]` 能取出 release_group/episode_number/video_resolution/file_extension，但**不会把括号内的 CJK 标题识别为 `anime_title`**。且当 `Parse()` 内部失败返回 false 时仍会填入已识别元素——桥接已改为「无视返回值、收割 elements_」。⇒ ADR-0006「有 anime_title 即判番剧」对 CJK 不成立，CJK 标题恢复必须由 Issue 03 fallback 承担（已在 03 验收标准补充）。

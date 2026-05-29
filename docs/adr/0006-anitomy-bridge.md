@@ -67,6 +67,8 @@ Movie.Name.2021.2160p.BluRay.x265.mkv
    - `[._ ](19|20)\d{2}[._ ]` 且无集号 → year + title，kind=.movie
    - 都不命中 → title=去扩展名的清洗文件名，kind=.unknown
 
+   > **实测修订（Issue 02）**：经典 Anitomy 对 `[组][CJK标题][NN][1080p]` 这类括号番剧名能取出 `episode_number`/`release_group`/`video_resolution`，但**不会把括号内的纯 CJK 标题识别为 `anime_title`**。因此「有 `anime_title` 即判番剧」对 CJK（mikanani 主场景）不成立。FilenameParser 必须额外处理「有 `episode_number` 但无 `anime_title`」：判 kind=.tv，并从去掉已识别 bracket 段后的剩余段恢复 CJK 标题（详见 Issue 03）。另外 `ANTParser` 在 Anitomy `Parse()` 返回 false 时仍收割已识别元素（不直接返回 nil），保证部分结果可用。
+
 ## Alternatives Considered
 
 ### A. 纯自研正则，不引 Anitomy

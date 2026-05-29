@@ -19,6 +19,8 @@ Blocks: 04, 11
 - [ ] 逻辑按 ADR-0006：
   - Anitomy 有 `anime_title` + `episode_number` → kind=.tv，映射各字段
   - 否则 regex：`S(\d+)E(\d+)`（大小写不敏感）→ tv；`(19|20)\d{2}` 且无集号 → movie；都不命中 → unknown，title=清洗后文件名
+- [ ] **CJK 标题恢复（Issue 02 发现，必做）**：经典 Anitomy 对 `[组][CJK标题][NN][1080p]` 返回 `episode_number`/`release_group`/`video_resolution` 但**无 `anime_title`**。FilenameParser 必须识别这种情形（有 episode_number 但无 anime_title）并从文件名结构恢复标题——典型启发式：取「去掉已识别的 group/episode/resolution/checksum/扩展名等 bracket 段后，剩下的那个 bracket 段（或最长非 ASCII 段）」作为 title，kind=.tv。
+  - fixture 必须覆盖：`[喵萌奶茶屋][葬送的芙莉莲][04][1080p][简日双语].mkv` → title="葬送的芙莉莲", episode=4, releaseGroup="喵萌奶茶屋", resolution="1080p", kind=.tv
 - [ ] title 清洗：去扩展名、去常见标签 `[...]`/`(...)`、归一空白
 - [ ] fixture 单测 `Tests/fixtures/filenames/`（每条 {filename, expected}）覆盖：
   - 多字幕组番剧命名（喵萌 / LoliHouse / Nekomoe / 动漫花园）
