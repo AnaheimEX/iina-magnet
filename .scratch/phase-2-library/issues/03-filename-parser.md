@@ -1,6 +1,6 @@
 # Issue 03 · FilenameParser 深模块（Anitomy 主 + regex 兜底）
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 1 (Schema + Scanner)
 Created: 2026-05-29
 Updated: 2026-05-29
@@ -43,3 +43,12 @@ Blocks: 04, 11
 - 扫描目录（→ Issue 04）
 
 ## Comments
+
+### 2026-05-29 claude
+完成并合并。实现要点 / 实测调整：
+- CJK 标题恢复按 Issue 02 发现实现：Anitomy 给了 episode 但无 anime_title 时，从 bracket 段里剔除 group/episode/resolution + 语言/源/编码标签噪声后，优先取含 CJK 的段为标题。fixture `[喵萌奶茶屋][葬送的芙莉莲][04][1080p][简日双语].mkv` → 正确恢复"葬送的芙莉莲"。
+- 实测 Anitomy 行为补丁：不识别裸 `4K`（加 resolution regex 兜底 → 归一 2160p）；不总提取年份（电影路径加 year regex 并从标题剥离年份）。
+- 分类修正：有 anime_title 但**无 episode 且无 year** → `.unknown`（而非误判 .tv）。
+- 正则全部预编译为 static 常量（code-review 修复，遵 RssRuleEngine 约定）。
+- 9 个 fixture 测试 + 1000 次解析 perf gate（<100ms）。全套 75 tests / 13 suites 通过。
+- 注：本机 CLI swift-testing 全量并行偶发 signal 11/SIGTRAP（与 .mainContext 同源的环境问题），重跑稳定通过；CI/真机不受影响。
