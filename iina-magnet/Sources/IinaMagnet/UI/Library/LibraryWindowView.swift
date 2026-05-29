@@ -68,8 +68,9 @@ public struct LibraryWindowView: View {
 
         scan = ScanState()
         let box = ModelContextBox(ModelContext(context.container))
+        let provider = CachingMetadataProvider(BangumiProvider(), cache: .shared)
         let coordinator = IngestCoordinator(
-            service: MetadataService(provider: BangumiProvider()),
+            service: MetadataService(provider: provider),
             context: box)
 
         Task { @MainActor in
@@ -114,9 +115,14 @@ private struct ArchiveScreen: View {
     @Environment(\.modelContext) private var context
     @State private var showMatchSheet = false
 
-    private let provider = BangumiProvider()
     private var editor: LibraryEditor { LibraryEditor(context: context) }
     private var vm: ArchiveViewModel { ArchiveViewModel(title) }
+
+    /// Caching provider (shared store) so a re-match reuses an already-fetched
+    /// subject's details and upserts stay serialized on one context.
+    private func makeProvider() -> CachingMetadataProvider {
+        CachingMetadataProvider(BangumiProvider(), cache: .shared)
+    }
 
     var body: some View {
         ArchiveView(vm: vm,
@@ -133,7 +139,7 @@ private struct ArchiveScreen: View {
                                               releaseYear: title.releaseYear, kind: title.kind),
                     search: { query in
                         let q = SearchQuery(title: query, kindHint: title.kind)
-                        return (try? await provider.search(q)) ?? []
+                        return (try? await makeProvider().search(q)) ?? []
                     },
                     onPick: { candidate in
                         showMatchSheet = false
@@ -151,7 +157,8 @@ private struct ArchiveScreen: View {
     /// main context — keeping the non-Sendable context off the await path.
     private func rebind(to candidate: MetadataCandidate) {
         Task { @MainActor in
-            guard let details = try? await provider.details(externalId: candidate.externalId) else { return }
+            guard let details = try? await makeProvider().details(externalId: candidate.externalId)
+            else { return }
             try? editor.applyRematch(details, to: title)
         }
     }
