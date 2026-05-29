@@ -100,30 +100,12 @@ public struct Ingester {
             title.matchState = .unmatched
             return
         }
-        if details.providerId == .bangumi, let bid = Int(details.externalId) {
-            title.bangumiId = bid
-        }
-        title.titleZh = details.titleZh ?? title.titleZh ?? parsed.title
-        title.titleJa = details.titleJa ?? title.titleJa
-        title.titleEn = details.titleEn ?? title.titleEn
-        title.overview = details.overview ?? title.overview
-        title.posterURL = details.posterURL ?? title.posterURL
-        title.releaseYear = details.releaseYear ?? title.releaseYear ?? parsed.year
-        title.runtimeMinutes = details.runtimeMinutes ?? title.runtimeMinutes
-        // Store the rating under its source's scalar so the UI can badge provenance.
-        if let rating = details.rating {
-            switch details.providerId {
-            case .bangumi: title.bangumiRating = rating
-            case .tmdb:    title.tmdbRating = rating
-            case .douban:  title.doubanRating = rating
-            // bangumi/tmdb/douban all use a 0–10 scale. Anilist scores 0–100 and
-            // has no scalar on Title yet — when it's added, normalize to 0–10 here
-            // (and before passing to TagDeriver) rather than storing the raw score.
-            case .anilist: break
-            }
-        }
-        title.matchState = resolution?.state ?? title.matchState
-        title.matchScore = resolution?.score ?? title.matchScore
+        MetadataApplier.apply(details, to: title,
+                              matchState: resolution?.state ?? title.matchState,
+                              matchScore: resolution?.score ?? title.matchScore)
+        // Parse-derived fallbacks when metadata left a field empty.
+        title.titleZh = title.titleZh ?? parsed.title
+        title.releaseYear = title.releaseYear ?? parsed.year
     }
 
     // MARK: - Tags
@@ -133,22 +115,7 @@ public struct Ingester {
                                         rating: details?.rating,
                                         resolution: parsed.resolution,
                                         releaseGroup: parsed.releaseGroup)
-        for d in derived {
-            let tag = try findOrCreateTag(name: d.name, category: d.category)
-            if !title.tags.contains(where: { $0.name == tag.name && $0.category == tag.category }) {
-                title.tags.append(tag)
-            }
-        }
-    }
-
-    private func findOrCreateTag(name: String, category: TagCategory) throws -> Tag {
-        let catRaw = category.rawValue
-        var d = FetchDescriptor<Tag>(predicate: #Predicate { $0.name == name && $0.categoryRaw == catRaw })
-        d.fetchLimit = 1
-        if let found = try context.fetch(d).first { return found }
-        let t = Tag(name: name, category: category)
-        context.insert(t)
-        return t
+        try TagApplier.apply(derived, to: title, context: context)
     }
 
     // MARK: - Season / Episode
