@@ -162,6 +162,46 @@ struct MetadataTests {
         let version = try #require(ep.versions.first)
         #expect(version.resolution == "1080p")
         #expect(version.releaseGroup == "喵萌奶茶屋")
+
+        // Auto-tags derived from metadata + version.
+        let tagPairs = Set(title.tags.map { "\($0.category.rawValue):\($0.name)" })
+        #expect(tagPairs.contains("\(TagCategory.year.rawValue):2023"))
+        #expect(tagPairs.contains("\(TagCategory.quality.rawValue):1080p"))
+        #expect(tagPairs.contains("\(TagCategory.releaseGroup.rawValue):喵萌奶茶屋"))
+        #expect(tagPairs.contains("\(TagCategory.ratingBucket.rawValue):6分+"))   // 6.8
+    }
+
+    @Test("IngestCoordinator runs scan→resolve→ingest over a multi-file tree")
+    func coordinator() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("coord-" + UUID().uuidString,
+                                                                 isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        for ep in 1...3 {
+            let u = root.appendingPathComponent("[喵萌奶茶屋][葬送的芙莉莲][0\(ep)][1080p].mkv")
+            try Data("x".utf8).write(to: u)
+        }
+        defer { try? fm.removeItem(at: root) }
+
+        let fake = FakeProvider(
+            candidate: .init(providerId: .bangumi, externalId: "459283", title: "葬送的芙莉莲", year: 2023),
+            detail: .init(providerId: .bangumi, externalId: "459283", titleZh: "葬送的芙莉莲",
+                          releaseYear: 2023, rating: 6.8,
+                          episodes: (1...3).map { .init(number: $0, title: "第\($0)集") }))
+        let ctx = ModelContext(PersistenceController.inMemory().container)
+        let coordinator = IngestCoordinator(service: MetadataService(provider: fake),
+                                            context: ModelContextBox(ctx))
+
+        var ticks = 0
+        let count = try await coordinator.run(roots: [root]) { _ in ticks += 1 }
+        #expect(count == 3)
+        #expect(ticks >= 3)
+
+        // One Title, one season, three episodes, three version files.
+        let titles = try ctx.fetch(FetchDescriptor<Title>())
+        #expect(titles.count == 1)
+        #expect(titles.first?.seasons.first?.episodes.count == 3)
+        #expect(try ctx.fetch(FetchDescriptor<VersionFile>()).count == 3)
     }
 
     @Test("Ingest is idempotent on fingerprint (re-scan doesn't duplicate)")
