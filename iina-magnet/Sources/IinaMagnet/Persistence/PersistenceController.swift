@@ -43,6 +43,15 @@ public final class PersistenceController {
             SubscriptionSource.self,
             SubscriptionRule.self,
             FeedItem.self,
+            // Phase 2 (Issue 01): media library. Additive — Phase 1 stores open
+            // unchanged via SwiftData lightweight migration.
+            Title.self,
+            Season.self,
+            Episode.self,
+            VersionFile.self,
+            Tag.self,
+            WatchProgress.self,
+            MetadataCache.self,
         ])
 
         do {
