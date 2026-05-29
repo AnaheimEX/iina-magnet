@@ -64,6 +64,8 @@ public struct BangumiProvider: MetadataProvider {
             }
         }
 
+        let (genres, countries) = Self.classifyTags(subject.meta_tags ?? [])
+
         return MetadataDetails(providerId: .bangumi,
                                externalId: externalId,
                                titleZh: subject.name_cn?.nonEmpty,
@@ -73,8 +75,45 @@ public struct BangumiProvider: MetadataProvider {
                                posterURL: subject.images?.large.flatMap(URL.init(string:)),
                                releaseYear: year(from: subject.date),
                                rating: subject.rating?.score,
+                               genres: genres,
+                               countries: countries,
                                episodes: episodes)
     }
+
+    // MARK: - meta_tags classification
+
+    /// Bangumi's curated `meta_tags` mix genres (奇幻 / 日常 …) with structural
+    /// tags (TV / 原创 / 漫画改 …), regions, and years. Route region tokens to
+    /// countries, drop structural/numeric noise, keep the rest as genres.
+    static func classifyTags(_ metaTags: [String]) -> (genres: [String], countries: [String]) {
+        var genres: [String] = []
+        var countries: [String] = []
+        var seenG = Set<String>(), seenC = Set<String>()
+
+        for raw in metaTags {
+            let t = raw.trimmingCharacters(in: .whitespaces)
+            guard !t.isEmpty else { continue }
+            if let country = countryTokens[t] {
+                if seenC.insert(country).inserted { countries.append(country) }
+            } else if structuralTags.contains(t) || t.allSatisfy(\.isNumber) {
+                continue   // media type / source / year — not a genre
+            } else if seenG.insert(t).inserted {
+                genres.append(t)
+            }
+        }
+        return (genres, countries)
+    }
+
+    /// Region meta_tags → normalized country name.
+    private static let countryTokens: [String: String] = [
+        "日本": "日本", "中国": "中国", "中国大陆": "中国", "美国": "美国",
+        "韩国": "韩国", "英国": "英国", "法国": "法国",
+    ]
+    /// Non-genre structural / source / media-type meta_tags to drop.
+    private static let structuralTags: Set<String> = [
+        "TV", "WEB", "OVA", "OAD", "剧场版", "动画", "番剧", "特摄",
+        "原创", "漫画改", "小说改", "游戏改", "Galgame改", "改编",
+    ]
 
     // MARK: - JSON shapes (verified against the live API)
 
@@ -93,6 +132,7 @@ public struct BangumiProvider: MetadataProvider {
         let date: String?
         let images: Images?
         let rating: Rating?
+        let meta_tags: [String]?
     }
     private struct Rating: Decodable { let score: Double? }
     private struct Images: Decodable { let large: String? }

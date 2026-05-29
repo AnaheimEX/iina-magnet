@@ -23,12 +23,17 @@ public enum TagDeriver {
                               rating: Double?,
                               resolution: String?,
                               releaseGroup: String?,
-                              genres: [String] = []) -> [DerivedTag] {
+                              genres: [String] = [],
+                              countries: [String] = []) -> [DerivedTag] {
         var tags: [DerivedTag] = []
 
         for g in genres {
             let name = g.trimmingCharacters(in: .whitespaces)
             if !name.isEmpty { tags.append(.init(name: name, category: .genre)) }
+        }
+        for c in countries {
+            let name = c.trimmingCharacters(in: .whitespaces)
+            if !name.isEmpty { tags.append(.init(name: name, category: .country)) }
         }
         if let year {
             tags.append(.init(name: String(year), category: .year))

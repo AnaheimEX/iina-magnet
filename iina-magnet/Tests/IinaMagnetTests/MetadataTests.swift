@@ -50,7 +50,8 @@ struct MetadataTests {
     """
     private static let subjectJSON = """
     {"name":"葬送のフリーレン","name_cn":"葬送的芙莉莲","summary":"勇者一行打倒了魔王。",
-    "date":"2023-10-11","images":{"large":"https://lain.bgm.tv/pic/459283.jpg"},"rating":{"score":6.8}}
+    "date":"2023-10-11","images":{"large":"https://lain.bgm.tv/pic/459283.jpg"},"rating":{"score":6.8},
+    "meta_tags":["奇幻","冒险","TV","日本","2023","漫画改"]}
     """
     private static let episodesJSON = """
     {"data":[{"ep":1,"sort":1,"name":"魔法のレシピ","name_cn":"","airdate":"2023-10-11"},
@@ -87,6 +88,17 @@ struct MetadataTests {
         #expect(d.episodes.first?.number == 1)
         #expect(d.episodes.first?.title == "魔法のレシピ")   // name_cn empty → falls back to name
         #expect(d.episodes.last?.title == "第二集")          // name_cn present → preferred
+        // meta_tags classified: genres kept, region → country, structural/year dropped.
+        #expect(d.genres == ["奇幻", "冒险"])
+        #expect(d.countries == ["日本"])
+    }
+
+    @Test("classifyTags routes regions, drops structural/numeric, keeps genres")
+    func classifyTags() {
+        let (genres, countries) = BangumiProvider.classifyTags(
+            ["治愈", "日常", "TV", "原创", "2022", "中国大陆", "日常"])
+        #expect(genres == ["治愈", "日常"])      // dedup, structural/year dropped
+        #expect(countries == ["中国"])           // 中国大陆 normalized
     }
 
     @Test("search percent-encodes '/' in the keyword (Fate/stay night)")
@@ -138,6 +150,7 @@ struct MetadataTests {
                           overview: "勇者一行打倒了魔王。",
                           posterURL: URL(string: "https://lain.bgm.tv/pic/459283.jpg"),
                           releaseYear: 2023, rating: 6.8, runtimeMinutes: 24,
+                          genres: ["奇幻", "冒险"], countries: ["日本"],
                           episodes: [.init(number: 1, title: "第一集", titleOriginal: "魔法のレシピ")]))
         let resolution = await MetadataService(provider: fake).resolve(file.parsed)
         #expect(resolution.state == .confirmed)
@@ -173,6 +186,8 @@ struct MetadataTests {
         #expect(tagPairs.contains("\(TagCategory.quality.rawValue):1080p"))
         #expect(tagPairs.contains("\(TagCategory.releaseGroup.rawValue):喵萌奶茶屋"))
         #expect(tagPairs.contains("\(TagCategory.ratingBucket.rawValue):6分+"))   // 6.8
+        #expect(tagPairs.contains("\(TagCategory.genre.rawValue):奇幻"))           // from metadata genres
+        #expect(tagPairs.contains("\(TagCategory.country.rawValue):日本"))         // from metadata countries
     }
 
     @Test("IngestCoordinator runs scan→resolve→ingest over a multi-file tree")

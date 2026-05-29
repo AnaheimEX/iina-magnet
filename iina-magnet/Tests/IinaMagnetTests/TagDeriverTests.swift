@@ -27,6 +27,13 @@ struct TagDeriverTests {
         #expect(tags == [.init(name: "奇幻", category: .genre), .init(name: "冒险", category: .genre)])
     }
 
+    @Test("Countries map to .country")
+    func countries() {
+        let tags = TagDeriver.derive(year: nil, rating: nil, resolution: nil,
+                                     releaseGroup: nil, countries: ["日本"])
+        #expect(tags == [.init(name: "日本", category: .country)])
+    }
+
     @Test("Missing/zero signals produce no tags")
     func empties() {
         #expect(TagDeriver.derive(year: nil, rating: 0, resolution: "", releaseGroup: "  ").isEmpty)

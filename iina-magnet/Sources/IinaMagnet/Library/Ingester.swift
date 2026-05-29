@@ -114,7 +114,9 @@ public struct Ingester {
         let derived = TagDeriver.derive(year: details?.releaseYear ?? title.releaseYear ?? parsed.year,
                                         rating: details?.rating,
                                         resolution: parsed.resolution,
-                                        releaseGroup: parsed.releaseGroup)
+                                        releaseGroup: parsed.releaseGroup,
+                                        genres: details?.genres ?? [],
+                                        countries: details?.countries ?? [])
         try TagApplier.apply(derived, to: title, context: context)
     }
 
