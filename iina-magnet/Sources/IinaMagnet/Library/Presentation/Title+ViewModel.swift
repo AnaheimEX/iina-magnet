@@ -27,7 +27,7 @@ extension LibraryItemViewModel {
         self.matchState = title.matchState
         self.runtimeMinutes = title.runtimeMinutes
         self.posterURL = title.posterURL
-        self.tagNames = title.tags.map(\.name)
+        self.tags = title.tags.map { TagRef(name: $0.name, category: $0.category) }
 
         // Walk versions once for count / top quality / file totals.
         let allVersions = title.seasons.flatMap { $0.episodes.flatMap(\.versions) }
@@ -44,6 +44,7 @@ extension LibraryItemViewModel {
             ? present.first?.fileURL.lastPathComponent
             : nil
 
+        self.addedAt = title.createdAt
         self.resume = LibraryItemViewModel.resume(of: title)
     }
 
