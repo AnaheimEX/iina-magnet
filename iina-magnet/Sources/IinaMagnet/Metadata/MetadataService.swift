@@ -44,38 +44,9 @@ public actor MetadataService {
         return MetadataResolution(details: details, candidates: candidates, score: score, state: state)
     }
 
-    /// Light scorer (full version is Issue 09): normalized title closeness + a
-    /// small year bonus. Good enough to pick among one source's candidates.
+    /// Picks the best candidate among one source's results (Issue 09 scorer).
     static func bestMatch(_ parsed: ParsedMedia,
                           _ candidates: [MetadataCandidate]) -> (MetadataCandidate, Double)? {
-        guard !candidates.isEmpty else { return nil }
-        let target = normalize(parsed.title)
-        var best: (MetadataCandidate, Double)?
-        for c in candidates {
-            var s = titleScore(target, normalize(c.title))
-            if let py = parsed.year, let cy = c.year {
-                s = s * 0.85 + (py == cy ? 0.15 : (abs(py - cy) <= 1 ? 0.07 : 0))
-            }
-            if best == nil || s > best!.1 { best = (c, s) }
-        }
-        return best
-    }
-
-    private static func normalize(_ s: String) -> String {
-        s.lowercased().replacingOccurrences(of: "[\\s\\p{P}]+", with: "",
-                                            options: .regularExpression)
-    }
-
-    /// 0–1 closeness: exact = 1; substring either way scaled by length ratio;
-    /// otherwise 0. Cheap, deterministic — no Levenshtein for the MVP.
-    private static func titleScore(_ a: String, _ b: String) -> Double {
-        if a.isEmpty || b.isEmpty { return 0 }
-        if a == b { return 1 }
-        if a.contains(b) || b.contains(a) {
-            let short = Double(min(a.count, b.count))
-            let long = Double(max(a.count, b.count))
-            return 0.6 + 0.4 * (short / long)
-        }
-        return 0
+        SimilarityScorer.bestMatch(parsed, candidates)
     }
 }
