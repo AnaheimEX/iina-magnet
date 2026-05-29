@@ -84,7 +84,8 @@ public struct LibraryEditor {
         // are shared many-to-many, so safe pruning needs reference counting
         // (follow-up); the new tags are additive here.
         let derived = TagDeriver.derive(year: details.releaseYear, rating: details.rating,
-                                        resolution: nil, releaseGroup: nil)
+                                        resolution: nil, releaseGroup: nil,
+                                        genres: details.genres, countries: details.countries)
         try TagApplier.apply(derived, to: title, context: context)
         try context.save()
     }
