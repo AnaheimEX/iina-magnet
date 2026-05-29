@@ -20,9 +20,9 @@
 
 | Model | 关键字段 | 约束 / 关系 |
 | --- | --- | --- |
-| `Title` | tmdbId?/bangumiId?/anilistId?/doubanId?, titleZh/En/Ja?, kindRaw, overview?, posterURL?/backdropURL?, releaseYear?, tmdbRating?/doubanRating?, matchStateRaw, matchScore, aggregateStateRaw | `seasons` 1-N cascade；`tags` N-N（删 Title 不删 Tag） |
+| `Title` | tmdbId?/bangumiId?/anilistId?/doubanId?, titleZh/En/Ja?, kindRaw, overview?, posterURL?/backdropURL?, releaseYear?, bangumiRating?/tmdbRating?/doubanRating?, runtimeMinutes?(电影时长), matchStateRaw, matchScore, aggregateStateRaw | `seasons` 1-N cascade；`tags` N-N（删 Title 不删 Tag） |
 | `Season` | number | inverse → title；`episodes` 1-N cascade |
-| `Episode` | number, seasonNumber(冗余), title?, airDate?, overview? | inverse → season；`versions` 1-N cascade |
+| `Episode` | number, seasonNumber(冗余), title?(zh), titleOriginal?(ja/en), airDate?, overview?, thumbnailURL? | inverse → season；`versions` 1-N cascade |
 | `VersionFile` | fileURL, bookmark?, fileSizeBytes, fileFingerprint(unique), resolution?, releaseGroup?, languages[], isMissing | inverse → episode |
 | `Tag` | name, categoryRaw | `titles` N-N（inverse of Title.tags） |
 | `WatchProgress` | seasonNumber?, episodeNumber?, lastPositionSec, durationSec, stateRaw, updatedAt | `title` 关系（不存 PersistentIdentifier）；键 (title, season, episode) 跨版本共享 |
