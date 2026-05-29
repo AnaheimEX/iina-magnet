@@ -56,6 +56,7 @@ public struct ArchiveView: View {
                 confirmBanner
                 synopsis
                 fileInfoSection
+                castSection
                 episodesSection
                 versionSection
             }
@@ -274,6 +275,38 @@ public struct ArchiveView: View {
                         .font(.system(size: 12)).foregroundStyle(LibraryTokens.text2)
                 }
                 .padding(12).background(LibraryTokens.bg2, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    // MARK: Cast (演职员) — only when the source provided it
+
+    @ViewBuilder
+    private var castSection: some View {
+        if !vm.cast.isEmpty {
+            section(title: "演职员", count: vm.cast.count) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 16) {
+                        ForEach(vm.cast) { member in
+                            VStack(spacing: 6) {
+                                ZStack {
+                                    PosterGradient.gradient(seed: member.name)
+                                    Text(member.name.prefix(2))
+                                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                                }
+                                .frame(width: 56, height: 56).clipShape(Circle())
+                                Text(member.name).font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(LibraryTokens.text).lineLimit(1)
+                                if let role = member.role {
+                                    Text(role).font(.system(size: 11)).foregroundStyle(LibraryTokens.text3)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .frame(width: 72)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
         }
     }

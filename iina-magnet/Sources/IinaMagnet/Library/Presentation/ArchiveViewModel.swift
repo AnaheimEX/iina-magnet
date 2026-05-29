@@ -88,7 +88,9 @@ public struct ArchiveViewModel: Identifiable, Sendable {
         self.tagNames = title.tags.map(\.name)
         self.matchState = title.matchState
         self.matchScore = title.matchScore
-        self.cast = []
+        self.cast = title.credits
+            .sorted { $0.order < $1.order }
+            .map { CastMember(id: $0.order, name: $0.actorName, role: $0.characterName) }
         self.resume = TitleDerivations.resume(of: title)
 
         let allVersions = title.seasons.flatMap { $0.episodes.flatMap(\.versions) }

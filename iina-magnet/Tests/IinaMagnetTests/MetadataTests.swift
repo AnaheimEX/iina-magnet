@@ -58,11 +58,20 @@ struct MetadataTests {
     {"ep":2,"sort":2,"name":"jp2","name_cn":"第二集","airdate":"2023-10-25"}]}
     """
 
+    private static let charactersJSON = """
+    [{"name":"芙莉莲","actors":[{"name":"种崎敦美"}]},
+     {"name":"费伦","actors":[{"name":"市之濑加那"}]},
+     {"name":"无声优角色","actors":[]}]
+    """
+
     private func bangumiStub() -> BangumiProvider {
+        // "/characters" must precede "/v0/subjects/" — the characters URL also
+        // contains "/v0/subjects/<id>/characters", and StubClient first-match wins.
         BangumiProvider(client: StubClient(routes: [
+            ("/characters", Self.charactersJSON),
             ("/search/subject/", Self.searchJSON),
-            ("/v0/subjects/", Self.subjectJSON),
             ("/v0/episodes", Self.episodesJSON),
+            ("/v0/subjects/", Self.subjectJSON),
         ]))
     }
 
@@ -91,6 +100,9 @@ struct MetadataTests {
         // meta_tags classified: genres kept, region → country, structural/year dropped.
         #expect(d.genres == ["奇幻", "冒险"])
         #expect(d.countries == ["日本"])
+        // cast: actor + character mapped; entries without an actor are dropped.
+        #expect(d.cast.count == 2)
+        #expect(d.cast.first == MetadataCast(actor: "种崎敦美", character: "芙莉莲"))
     }
 
     @Test("classifyTags routes regions, drops structural/numeric, keeps genres")
@@ -151,6 +163,7 @@ struct MetadataTests {
                           posterURL: URL(string: "https://lain.bgm.tv/pic/459283.jpg"),
                           releaseYear: 2023, rating: 6.8, runtimeMinutes: 24,
                           genres: ["奇幻", "冒险"], countries: ["日本"],
+                          cast: [.init(actor: "种崎敦美", character: "芙莉莲")],
                           episodes: [.init(number: 1, title: "第一集", titleOriginal: "魔法のレシピ")]))
         let resolution = await MetadataService(provider: fake).resolve(file.parsed)
         #expect(resolution.state == .confirmed)
@@ -188,6 +201,11 @@ struct MetadataTests {
         #expect(tagPairs.contains("\(TagCategory.ratingBucket.rawValue):6分+"))   // 6.8
         #expect(tagPairs.contains("\(TagCategory.genre.rawValue):奇幻"))           // from metadata genres
         #expect(tagPairs.contains("\(TagCategory.country.rawValue):日本"))         // from metadata countries
+
+        // Cast credits populated from metadata.
+        #expect(title.credits.count == 1)
+        #expect(title.credits.first?.actorName == "种崎敦美")
+        #expect(title.credits.first?.characterName == "芙莉莲")
     }
 
     @Test("IngestCoordinator runs scan→resolve→ingest over a multi-file tree")
