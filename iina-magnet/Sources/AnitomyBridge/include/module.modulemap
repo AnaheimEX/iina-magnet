@@ -1,0 +1,4 @@
+module AnitomyBridge {
+    header "AnitomyBridge.h"
+    export *
+}
