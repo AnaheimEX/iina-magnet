@@ -1,0 +1,158 @@
+//
+//  LibraryWindowView.swift
+//  IinaMagnet
+//
+//  Root of the Library window (Issue 20): the @Query host that feeds the
+//  browser + detail pages with live data, drives scanning through
+//  IngestCoordinator, and wires the archive page's confirm/re-match actions to
+//  LibraryEditor + the Bangumi provider. Opened from the Magnet ▸ Library menu.
+
+import SwiftUI
+import SwiftData
+import AppKit
+import OSLog
+
+public struct LibraryWindowView: View {
+
+    private static let logger = Logger(subsystem: "iina-magnet", category: "library-window")
+
+    @Environment(\.modelContext) private var context
+    @Query(sort: \Title.createdAt, order: .reverse) private var titles: [Title]
+
+    @State private var route: PersistentIdentifier?          // nil → browser, else archive
+    @State private var scan: ScanState?
+    @State private var didScan = false                       // a scan has completed this session
+    @State private var folderStore = LibraryFolderStore.shared
+
+    public init() {}
+
+    private struct ScanState: Equatable {
+        var done = 0, total = 0, current = ""
+    }
+
+    private var items: [LibraryItemViewModel] { titles.map(LibraryItemViewModel.init) }
+
+    private var displayState: LibraryDisplayState {
+        if let scan { return .scanning(done: scan.done, total: scan.total, current: scan.current) }
+        if !folderStore.isConfigured && titles.isEmpty { return .unconfigured }
+        // Configured + empty: prompt to scan only if we haven't yet this session;
+        // after a scan that found nothing, fall through to the normal (empty) view
+        // so the user isn't stuck on the "click to scan" prompt forever.
+        if folderStore.isConfigured && titles.isEmpty && !didScan {
+            return .unscanned(folderSummary: folderStore.summary())
+        }
+        return .normal
+    }
+
+    public var body: some View {
+        Group {
+            if let id = route, let title = titles.first(where: { $0.persistentModelID == id }) {
+                ArchiveScreen(title: title, onBack: { route = nil })
+            } else {
+                MediaLibraryView(items: items,
+                                 displayState: displayState,
+                                 onOpen: { route = $0 },
+                                 onScan: startScan,
+                                 onCancelScan: { scan = nil })
+            }
+        }
+        .frame(minWidth: 900, minHeight: 560)
+    }
+
+    // MARK: - Scanning
+
+    private func startScan() {
+        if !folderStore.isConfigured, !pickFolders() { return }
+        let access = folderStore.resolveRoots()
+        guard !access.urls.isEmpty else { access.release(); return }
+
+        scan = ScanState()
+        let box = ModelContextBox(ModelContext(context.container))
+        let coordinator = IngestCoordinator(
+            service: MetadataService(provider: BangumiProvider()),
+            context: box)
+
+        Task { @MainActor in
+            defer { scan = nil; didScan = true; access.release() }
+            do {
+                // IngestCoordinator.run is nonisolated async, so its onProgress
+                // closure fires off the main actor — hop each tick back to the
+                // main actor before touching @State.
+                _ = try await coordinator.run(roots: access.urls) { p in
+                    let state = ScanState(done: p.scanned, total: p.total,
+                                          current: p.current?.lastPathComponent ?? "")
+                    Task { @MainActor in scan = state }
+                }
+            } catch {
+                Self.logger.error("scan failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Prompts for media folders; returns true if at least one was added.
+    private func pickFolders() -> Bool {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "添加"
+        panel.message = "选择包含番剧 / 电影的文件夹"
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return false }
+        panel.urls.forEach(folderStore.add)
+        return true
+    }
+}
+
+// MARK: - Archive screen (detail page + edit actions)
+
+/// Wraps ArchiveView with the LibraryEditor actions and the manual-match sheet,
+/// so the detail page can confirm / mark-unmatched / hand-edit / re-match.
+private struct ArchiveScreen: View {
+    let title: Title
+    var onBack: () -> Void
+
+    @Environment(\.modelContext) private var context
+    @State private var showMatchSheet = false
+
+    private let provider = BangumiProvider()
+    private var editor: LibraryEditor { LibraryEditor(context: context) }
+    private var vm: ArchiveViewModel { ArchiveViewModel(title) }
+
+    var body: some View {
+        ArchiveView(vm: vm,
+                    fileInfo: vm.isUnmatched ? vm.fileInfo(from: title) : nil,
+                    onBack: onBack,
+                    onPlay: {},
+                    onConfirm: { try? editor.confirm(title) },
+                    onMarkUnmatched: { try? editor.markUnmatched(title) },
+                    onMatchSheet: { showMatchSheet = true })
+            .sheet(isPresented: $showMatchSheet) {
+                ManualMatchSheet(
+                    initialQuery: title.titleZh ?? title.titleJa ?? "",
+                    initialEdits: ManualEdits(titleZh: title.titleZh, titleJa: title.titleJa,
+                                              releaseYear: title.releaseYear, kind: title.kind),
+                    search: { query in
+                        let q = SearchQuery(title: query, kindHint: title.kind)
+                        return (try? await provider.search(q)) ?? []
+                    },
+                    onPick: { candidate in
+                        showMatchSheet = false
+                        rebind(to: candidate)
+                    },
+                    onManualSave: { edits in
+                        showMatchSheet = false
+                        try? editor.applyManual(edits, to: title)
+                    },
+                    onClose: { showMatchSheet = false })
+            }
+    }
+
+    /// Fetches the picked candidate's full details (async), then applies on the
+    /// main context — keeping the non-Sendable context off the await path.
+    private func rebind(to candidate: MetadataCandidate) {
+        Task { @MainActor in
+            guard let details = try? await provider.details(externalId: candidate.externalId) else { return }
+            try? editor.applyRematch(details, to: title)
+        }
+    }
+}

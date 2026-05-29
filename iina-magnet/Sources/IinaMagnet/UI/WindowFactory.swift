@@ -16,6 +16,7 @@ import SwiftUI
 public enum MagnetWindowKey: String {
     case rssManager  = "magnet.rss-manager"
     case btManager   = "magnet.bt-manager"
+    case library     = "magnet.library"
     case settings    = "magnet.settings"
     case disclaimer  = "magnet.disclaimer"
 }
