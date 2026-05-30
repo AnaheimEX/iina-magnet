@@ -1,6 +1,6 @@
 # Issue 14 · 档案页跳播 + 版本切换
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 3 (档案页 UI)
 Created: 2026-05-29
 Updated: 2026-05-29
