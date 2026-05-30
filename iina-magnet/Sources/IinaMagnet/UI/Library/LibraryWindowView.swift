@@ -146,7 +146,8 @@ private struct ArchiveScreen: View {
         ArchiveView(vm: vm,
                     fileInfo: vm.isUnmatched ? vm.fileInfo(from: title) : nil,
                     onBack: onBack,
-                    onPlay: {},
+                    onPlay: { LibraryPlayback.play($0, using: IinaBridgeRegistry.bridge) },
+                    onReveal: { LibraryPlayback.revealInFinder($0) },
                     onConfirm: { try? editor.confirm(title) },
                     onMarkUnmatched: { try? editor.markUnmatched(title) },
                     onMatchSheet: { showMatchSheet = true })
