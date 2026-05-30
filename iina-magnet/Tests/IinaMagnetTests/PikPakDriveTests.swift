@@ -135,6 +135,19 @@ private let listJSON = """
         #expect(stub.gets[1].headers["Authorization"] == "Bearer acc2")   // refreshed token used
     }
 
+    @Test func capturedCaptchaTokenSentFromFirstRequest() async throws {
+        let stub = QueueStub(["/drive/v1/files": [(200, listJSON)]])
+        let auth = PikPakAuth(config: .web, http: stub, store: InMemoryPikPakTokenStore())
+        await auth.adopt(PikPakWebCredentials(accessToken: "acc", refreshToken: "ref",
+                                              userID: "u", deviceID: "dev", expiresIn: 7200,
+                                              captchaToken: "CAP-LIVE"))
+        let drive = PikPakDrive(auth: auth, http: stub, config: .web)
+
+        _ = try await drive.list()
+        #expect(stub.gets.count == 1)                                  // no code-9 round trip
+        #expect(stub.gets.first?.headers["X-Captcha-Token"] == "CAP-LIVE")
+    }
+
     @Test func retriesAfterCaptchaExpiry() async throws {
         let stub = QueueStub([
             "/drive/v1/files": [(200, #"{"error":"captcha_invalid","error_code":9}"#), (200, listJSON)],
@@ -160,5 +173,23 @@ private let listJSON = """
         } catch let PikPakError.api(code, _) {
             #expect(code == 10)
         } catch { Issue.record("wrong error: \(error)") }
+    }
+}
+
+@Suite struct PikPakBrowsingTests {
+    private func file(_ id: String, _ name: String, folder: Bool) -> PikPakFile {
+        PikPakFile(id: id, name: name, isFolder: folder, size: 0,
+                   mimeType: nil, thumbnailURL: nil, modifiedTime: nil)
+    }
+
+    @Test func foldersFirstThenNaturalNameOrder() {
+        let input = [
+            file("1", "ep10.mkv", folder: false),
+            file("2", "Zeta", folder: true),
+            file("3", "ep2.mkv", folder: false),
+            file("4", "Anime", folder: true),
+        ]
+        let ordered = PikPakBrowsing.ordered(input)
+        #expect(ordered.map(\.name) == ["Anime", "Zeta", "ep2.mkv", "ep10.mkv"])
     }
 }

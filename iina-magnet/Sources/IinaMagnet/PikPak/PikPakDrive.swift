@@ -107,7 +107,9 @@ public actor PikPakDrive {
     private func authorizedGet(path: String, query: [String: String]) async throws -> Data {
         let url = buildURL(path: path, query: query)
         let action = PikPakCrypto.action(method: "GET", url: url)
-        var captcha = ""                       // start without one; mint only if asked
+        // Seed with the captcha token captured from the web login, so the first
+        // call already carries a valid one (no salt-dependent re-sign needed).
+        var captcha = await auth.currentCaptchaToken
         var triedRefresh = false
         var triedCaptcha = false
 
@@ -129,7 +131,10 @@ public actor PikPakDrive {
             case 9:                                          // captcha token expired
                 guard !triedCaptcha else { throw apiError(in: data, status: status, code: code) }
                 triedCaptcha = true
-                captcha = try await auth.captchaToken(forAction: action, refresh: true)
+                // Try a self-signed token; if that's rejected (stale salts), ask
+                // the user to re-login so we can re-capture a valid one.
+                do { captcha = try await auth.captchaToken(forAction: action, refresh: true) }
+                catch { throw PikPakError.captchaRequired("PikPak 验证已过期，请重新登录 PikPak。") }
             default:
                 throw apiError(in: data, status: status, code: code)
             }
