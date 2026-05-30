@@ -21,6 +21,7 @@ public struct LibraryWindowView: View {
 
     @State private var route: PersistentIdentifier?          // nil → browser, else archive
     @State private var showPending = false                   // 待确认队列
+    @State private var showPikPak = false                    // PikPak 网盘
     @State private var scan: ScanState?
     @State private var didScan = false                       // a scan has completed this session
     @State private var folderStore = LibraryFolderStore.shared
@@ -59,13 +60,16 @@ public struct LibraryWindowView: View {
                     onBack: { showPending = false },
                     onOpen: { showPending = false; route = $0 },
                     onConfirm: confirm)
+            } else if showPikPak {
+                PikPakView(onBack: { showPikPak = false })
             } else {
                 MediaLibraryView(items: items,
                                  displayState: displayState,
                                  onOpen: { route = $0 },
                                  onScan: startScan,
                                  onCancelScan: { scan = nil },
-                                 onOpenPending: { showPending = true })
+                                 onOpenPending: { showPending = true },
+                                 onOpenPikPak: { showPikPak = true })
             }
         }
         .frame(minWidth: 900, minHeight: 560)

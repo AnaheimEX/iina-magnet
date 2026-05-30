@@ -7,6 +7,8 @@
 //
 
 import Cocoa
+// MARK: iina-magnet hook
+import IinaMagnet
 
 fileprivate extension NSUserInterfaceItemIdentifier {
   static let openFile = NSUserInterfaceItemIdentifier("openFile")
@@ -148,6 +150,29 @@ class InitialWindowController: NSWindowController {
       UserDefaults.standard.addObserver(self, forKeyPath: key.rawValue, options: .new, context: nil)
     }
     reloadData()
+
+    // MARK: iina-magnet hook — media-library entry button below the build badge
+    setUpMediaLibraryButton()
+  }
+
+  // MARK: iina-magnet hook
+
+  /// Adds a "媒体库" button beneath the version / debug badge on the launch
+  /// window, opening the media-library window via IinaMagnet.
+  private func setUpMediaLibraryButton() {
+    guard let host = betaIndicatorView.superview else { return }
+    let button = NSButton(title: "媒体库", target: self, action: #selector(openMediaLibrary))
+    button.bezelStyle = .rounded
+    button.translatesAutoresizingMaskIntoConstraints = false
+    host.addSubview(button)
+    NSLayoutConstraint.activate([
+      button.topAnchor.constraint(equalTo: betaIndicatorView.bottomAnchor, constant: 12),
+      button.centerXAnchor.constraint(equalTo: betaIndicatorView.centerXAnchor)
+    ])
+  }
+
+  @objc private func openMediaLibrary() {
+    MainActor.assumeIsolated { IinaMagnetBootstrap.openLibrary() }
   }
 
   private func setMaterial(_ theme: Preference.Theme?) {

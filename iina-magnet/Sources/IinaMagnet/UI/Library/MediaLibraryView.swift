@@ -30,6 +30,7 @@ public struct MediaLibraryView: View {
     private let onScan: () -> Void
     private let onCancelScan: () -> Void
     private let onOpenPending: (() -> Void)?
+    private let onOpenPikPak: () -> Void
 
     @State private var section: LibrarySection = .all
     @State private var selectedTags: Set<String> = []
@@ -43,13 +44,15 @@ public struct MediaLibraryView: View {
                 onOpen: @escaping (PersistentIdentifier) -> Void = { _ in },
                 onScan: @escaping () -> Void = {},
                 onCancelScan: @escaping () -> Void = {},
-                onOpenPending: (() -> Void)? = nil) {
+                onOpenPending: (() -> Void)? = nil,
+                onOpenPikPak: @escaping () -> Void = {}) {
         self.items = items
         self.displayState = displayState
         self.onOpen = onOpen
         self.onScan = onScan
         self.onCancelScan = onCancelScan
         self.onOpenPending = onOpenPending
+        self.onOpenPikPak = onOpenPikPak
     }
 
     private var filtered: [LibraryItemViewModel] {
@@ -69,7 +72,8 @@ public struct MediaLibraryView: View {
             HStack(spacing: 0) {
                 if sidebarOpen {
                     LibrarySidebar(items: items, counts: counts,
-                                   section: $section, selectedTags: $selectedTags)
+                                   section: $section, selectedTags: $selectedTags,
+                                   onOpenPikPak: onOpenPikPak)
                     Divider().overlay(LibraryTokens.sep)
                 }
                 content(filtered: filtered)
