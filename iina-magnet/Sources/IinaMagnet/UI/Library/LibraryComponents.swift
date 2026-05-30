@@ -167,18 +167,9 @@ struct PosterArt: View {
             if item.kind == .unknown || item.posterURL == nil {
                 placeholder
             } else if let url = item.posterURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .failure:
-                        failurePlaceholder
-                    case .empty:
-                        ProgressView().controlSize(.small)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
+                // Cache-first; the title-seeded gradient already sits behind in the
+                // ZStack, so a still-loading / failed fetch degrades to that.
+                CachedAsyncImage(url: url) { Color.clear }
             }
         }
         .clipped()
@@ -204,11 +195,6 @@ struct PosterArt: View {
                 }
             }
         }
-    }
-
-    private var failurePlaceholder: some View {
-        Image(systemName: "icloud.slash").font(.system(size: 26))
-            .foregroundStyle(.white.opacity(0.8))
     }
 }
 

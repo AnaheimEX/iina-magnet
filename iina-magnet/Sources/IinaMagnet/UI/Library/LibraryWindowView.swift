@@ -31,7 +31,10 @@ public struct LibraryWindowView: View {
         var done = 0, total = 0, current = ""
     }
 
-    private var items: [LibraryItemViewModel] { titles.map(LibraryItemViewModel.init) }
+    @State private var itemCache = LibraryItemCache()
+    /// Memoized so an unrelated @State change (scan tick, route, sidebar toggle)
+    /// doesn't rebuild every card's view model + re-walk every Title's tree.
+    private var items: [LibraryItemViewModel] { itemCache.items(for: titles) }
 
     private var displayState: LibraryDisplayState {
         if let scan { return .scanning(done: scan.done, total: scan.total, current: scan.current) }
