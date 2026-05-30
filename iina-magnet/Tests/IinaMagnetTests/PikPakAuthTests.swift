@@ -88,6 +88,10 @@ private final class StubPikPakClient: PikPakHTTPClient, @unchecked Sendable {
         }
         return (Data("{}".utf8), 404)
     }
+
+    func getJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int) {
+        try await postJSON(url, body: Data(), headers: headers)
+    }
 }
 
 private let okCaptcha: (Int, String) = (200, #"{"captcha_token":"ct-xyz","expires_in":300}"#)
