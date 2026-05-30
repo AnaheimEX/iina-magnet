@@ -9,7 +9,7 @@ import Testing
 import Foundation
 @testable import IinaMagnet
 
-private struct StubReq: Sendable { let url: URL; let headers: [String: String] }
+private struct StubReq: Sendable { let url: URL; let headers: [String: String]; let body: String }
 
 /// Routes by URL-path substring to a FIFO queue of (status, json); the last
 /// entry repeats. Records GET/POST requests for assertions.
@@ -34,11 +34,12 @@ private final class QueueStub: PikPakHTTPClient, @unchecked Sendable {
     }
 
     func getJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int) {
-        lock.withLock { gets.append(StubReq(url: url, headers: headers)) }
+        lock.withLock { gets.append(StubReq(url: url, headers: headers, body: "")) }
         return pop(url)
     }
     func postJSON(_ url: URL, body: Data, headers: [String: String]) async throws -> (Data, Int) {
-        lock.withLock { posts.append(StubReq(url: url, headers: headers)) }
+        let text = String(data: body, encoding: .utf8) ?? ""
+        lock.withLock { posts.append(StubReq(url: url, headers: headers, body: text)) }
         return pop(url)
     }
 }
@@ -161,6 +162,36 @@ private let listJSON = """
         #expect(stub.posts.contains { $0.url.path.contains("captcha/init") })
         // The retried GET carried the freshly minted captcha token.
         #expect(stub.gets[1].headers["X-Captcha-Token"] == "ct-9")
+    }
+
+    @Test func offlineDownloadSavesIntoExistingPackFolder() async throws {
+        // Root listing already has "Pack From Shared" → no folder creation.
+        let folderList = #"{"files":[{"id":"pack1","kind":"drive#folder","name":"Pack From Shared"}],"next_page_token":""}"#
+        let taskResp = #"{"task":{"id":"t1","file_id":"f1","file_name":"番剧.mkv","phase":"PHASE_TYPE_RUNNING"}}"#
+        let stub = QueueStub(["/drive/v1/files": [(200, folderList), (200, taskResp)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        let task = try await drive.offlineDownload(url: "magnet:?xt=urn:btih:ABC&dn=x", name: "x")
+        #expect(task.fileID == "f1")
+        #expect(stub.gets.count == 1)        // one list call to find the folder
+        let post = try #require(stub.posts.first)
+        #expect(post.body.contains("UPLOAD_TYPE_URL"))
+        #expect(post.body.contains("magnet:?xt=urn:btih:ABC"))
+        #expect(post.body.contains("\"parent_id\":\"pack1\""))   // saved into Pack From Shared
+    }
+
+    @Test func offlineDownloadCreatesPackFolderWhenMissing() async throws {
+        let emptyRoot = #"{"files":[],"next_page_token":""}"#
+        let created = #"{"file":{"id":"newpack","kind":"drive#folder","name":"Pack From Shared"}}"#
+        let taskResp = #"{"task":{"id":"t1","file_id":"f1","name":"x","phase":"PHASE_TYPE_PENDING"}}"#
+        let stub = QueueStub(["/drive/v1/files": [(200, emptyRoot), (200, created), (200, taskResp)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        let task = try await drive.offlineDownload(url: "magnet:?xt=urn:btih:Z", name: "x")
+        #expect(task.fileID == "f1")
+        #expect(stub.posts.count == 2)       // create folder + add task
+        #expect(stub.posts[0].body.contains("drive#folder"))
+        #expect(stub.posts[1].body.contains("\"parent_id\":\"newpack\""))
     }
 
     @Test func nonRetryableErrorIsThrown() async {

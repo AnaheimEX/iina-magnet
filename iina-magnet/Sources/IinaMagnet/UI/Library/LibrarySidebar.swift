@@ -76,6 +76,7 @@ struct LibrarySidebar: View {
     @Binding var selectedTags: Set<String>
     var compact: Bool = false            // icon-only mode (labels/counts/tag groups hidden)
     var onOpenPikPak: () -> Void = {}    // PikPak cloud-drive entry point
+    var onOpenMikan: () -> Void = {}     // Mikan (mikanani.me) entry point
 
     @State private var openGroups: Set<TagCategory> = [.genre]
 
@@ -89,6 +90,8 @@ struct LibrarySidebar: View {
                         active: section == .recent) { section = .recent }
                     row("PikPak 网盘", icon: "cloud", count: nil,
                         active: false, tint: LibraryTokens.accent, action: onOpenPikPak)
+                    row("蜜柑计划", icon: "leaf", count: nil,
+                        active: false, tint: LibraryTokens.accent, action: onOpenMikan)
                 }
 
                 group(header: "观看状态") {

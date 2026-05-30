@@ -45,6 +45,16 @@ public struct PikPakFile: Sendable, Identifiable, Equatable {
     ]
 }
 
+/// A PikPak offline-download task.
+public struct PikPakTask: Sendable, Equatable {
+    public let id: String
+    public let fileID: String
+    public let name: String
+    public let phase: String        // PHASE_TYPE_RUNNING / _COMPLETE / _PENDING / _ERROR
+
+    public var isComplete: Bool { phase == "PHASE_TYPE_COMPLETE" }
+}
+
 // MARK: - Drive client
 
 public actor PikPakDrive {
@@ -53,6 +63,10 @@ public actor PikPakDrive {
     private let auth: PikPakAuth
     private let http: PikPakHTTPClient
     private let config: PikPakConfig
+
+    /// Cloud folder offline downloads are saved into; created on first use.
+    public var offlineFolderName = "Pack From Shared"
+    private var cachedOfflineFolderID: String?
 
     public init(auth: PikPakAuth = .shared,
                 http: PikPakHTTPClient = URLSessionPikPakClient(),
@@ -95,6 +109,64 @@ public actor PikPakDrive {
         return url
     }
 
+    /// Adds an offline-download task (magnet / torrent / direct URL) that saves
+    /// into a named cloud folder (default "Pack From Shared", created if absent)
+    /// so saved titles are grouped and readable. Returns the created task (its
+    /// `fileID` is the cloud file, usable for playback once content arrives).
+    @discardableResult
+    public func offlineDownload(url: String, name: String = "") async throws -> PikPakTask {
+        let parent = try await offlineFolderID()
+        let request = OfflineDownloadRequest(
+            name: name,
+            url: .init(url: url),
+            parent_id: parent,
+            folder_type: "")
+        let data = try await authorizedPost(path: "/drive/v1/files", body: request)
+        let resp = try decode(OfflineDownloadResponse.self, from: data)
+        guard let task = resp.task?.asTask else {
+            throw PikPakError.api(code: -3, message: "PikPak 未返回离线任务")
+        }
+        return task
+    }
+
+    /// Id of the offline-download target folder, resolved (find-or-create) once
+    /// and cached.
+    private func offlineFolderID() async throws -> String {
+        if let cached = cachedOfflineFolderID { return cached }
+        let id = try await findOrCreateFolder(named: offlineFolderName, parentID: "")
+        cachedOfflineFolderID = id
+        return id
+    }
+
+    private func findOrCreateFolder(named name: String, parentID: String) async throws -> String {
+        if let existing = try await list(parentID: parentID).first(where: {
+            $0.isFolder && $0.name.caseInsensitiveCompare(name) == .orderedSame
+        }) {
+            return existing.id
+        }
+        let data = try await authorizedPost(path: "/drive/v1/files",
+                                             body: CreateFolderRequest(parent_id: parentID, name: name))
+        let resp = try decode(CreateFolderResponse.self, from: data)
+        guard let id = resp.file?.id, !id.isEmpty else {
+            throw PikPakError.api(code: -5, message: "无法创建文件夹「\(name)」")
+        }
+        return id
+    }
+
+    /// Polls a freshly-created file until it has a playable URL (content has
+    /// started arriving), so an offline task can be "cloud-played" once ready.
+    public func waitForPlayableURL(fileID: String, timeoutSeconds: Double = 40,
+                                   pollSeconds: Double = 2) async throws -> URL {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while true {
+            if let url = try? await playbackURL(fileID: fileID) { return url }
+            if Date() >= deadline {
+                throw PikPakError.api(code: -4, message: "文件仍在下载中，请稍后在 PikPak 网盘里播放")
+            }
+            try await Task.sleep(nanoseconds: UInt64(pollSeconds * 1_000_000_000))
+        }
+    }
+
     // MARK: - Request plumbing
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
@@ -102,13 +174,26 @@ public actor PikPakDrive {
         catch { throw PikPakError.decoding(String(data: data, encoding: .utf8) ?? "\(error)") }
     }
 
-    /// Performs an authorized GET, applying PikPak's error-code retry policy
-    /// (token refresh / captcha re-sign) up to a small budget.
     private func authorizedGet(path: String, query: [String: String]) async throws -> Data {
         let url = buildURL(path: path, query: query)
         let action = PikPakCrypto.action(method: "GET", url: url)
-        // Seed with the captcha token captured from the web login, so the first
-        // call already carries a valid one (no salt-dependent re-sign needed).
+        return try await authorized(action: action) { try await self.http.getJSON(url, headers: $0) }
+    }
+
+    private func authorizedPost<Body: Encodable>(path: String, body: Body) async throws -> Data {
+        let url = buildURL(path: path, query: [:])
+        let action = PikPakCrypto.action(method: "POST", url: url)
+        let encoded = try JSONEncoder().encode(body)
+        return try await authorized(action: action) { try await self.http.postJSON(url, body: encoded, headers: $0) }
+    }
+
+    /// Runs an authorized request, applying PikPak's error-code retry policy
+    /// (token refresh on 16/4121/4122, captcha re-sign on 9) up to a small
+    /// budget. `perform` is the bare HTTP call given the auth headers.
+    private func authorized(action: String,
+                            _ perform: (_ headers: [String: String]) async throws -> (Data, Int)) async throws -> Data {
+        // Seed with the captcha token captured at web login, so the first call
+        // already carries a valid one (no salt-dependent re-sign needed).
         var captcha = await auth.currentCaptchaToken
         var triedRefresh = false
         var triedCaptcha = false
@@ -120,7 +205,7 @@ public actor PikPakDrive {
             if let device = await auth.currentDeviceID { headers["X-Device-ID"] = device }
             if !captcha.isEmpty { headers["X-Captcha-Token"] = captcha }
 
-            let (data, status) = try await http.getJSON(url, headers: headers)
+            let (data, status) = try await perform(headers)
             guard let code = errorCode(in: data, status: status) else { return data }
 
             switch code {
@@ -230,6 +315,45 @@ struct PPMedia: Decodable {
 
 struct PPMediaLink: Decodable {
     let url: String?
+}
+
+struct OfflineDownloadRequest: Encodable {
+    let kind = "drive#file"
+    let name: String
+    let upload_type = "UPLOAD_TYPE_URL"
+    let url: URLField
+    let parent_id: String
+    let folder_type: String
+    struct URLField: Encodable { let url: String }
+}
+
+struct CreateFolderRequest: Encodable {
+    let kind = "drive#folder"
+    let parent_id: String
+    let name: String
+}
+
+struct CreateFolderResponse: Decodable {
+    let file: PPFile?
+}
+
+struct OfflineDownloadResponse: Decodable {
+    let task: PPTask?
+}
+
+struct PPTask: Decodable {
+    let id: String?
+    let file_id: String?
+    let file_name: String?
+    let name: String?
+    let phase: String?
+
+    var asTask: PikPakTask {
+        PikPakTask(id: id ?? "",
+                   fileID: file_id ?? "",
+                   name: file_name?.nonEmpty ?? name ?? "",
+                   phase: phase ?? "")
+    }
 }
 
 private extension String {
