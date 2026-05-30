@@ -14,11 +14,8 @@ import SwiftUI
 
 @MainActor
 public enum MagnetWindowKey: String {
-    case rssManager  = "magnet.rss-manager"
-    case btManager   = "magnet.bt-manager"
-    case library     = "magnet.library"
-    case settings    = "magnet.settings"
-    case disclaimer  = "magnet.disclaimer"
+    case library     = "iina-magnet.library"
+    case disclaimer  = "iina-magnet.disclaimer"
 }
 
 @MainActor
@@ -45,7 +42,7 @@ public final class WindowFactory {
             backing: .buffered,
             defer: false
         )
-        window.title = "Magnet — \(title)"
+        window.title = title
         window.center()
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(rootView: builder())

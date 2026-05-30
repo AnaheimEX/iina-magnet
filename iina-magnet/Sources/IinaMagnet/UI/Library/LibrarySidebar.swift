@@ -71,6 +71,7 @@ struct LibrarySidebar: View {
     let counts: LibraryCounts            // computed once by the host, shared with the stats bar
     @Binding var section: LibrarySection
     @Binding var selectedTags: Set<String>
+    var onOpenPikPak: () -> Void = {}    // PikPak cloud-drive entry point
 
     @State private var openGroups: Set<TagCategory> = [.genre]
 
@@ -82,6 +83,8 @@ struct LibrarySidebar: View {
                         active: section == .all) { section = .all }
                     row("最近添加", icon: "clock", count: nil,
                         active: section == .recent) { section = .recent }
+                    row("PikPak 网盘", icon: "cloud", count: nil,
+                        active: false, tint: LibraryTokens.accent, action: onOpenPikPak)
                 }
 
                 group(header: "观看状态") {

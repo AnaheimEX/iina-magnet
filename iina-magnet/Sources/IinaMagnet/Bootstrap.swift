@@ -34,7 +34,6 @@ public enum IinaMagnetBootstrap {
         didStart = true
         logger.info("IinaMagnetBootstrap.start")
 
-        installLibraryMenuEntry()
         presentDisclaimerIfNeeded()
         startWatchProgressTracking()
     }
@@ -45,6 +44,16 @@ public enum IinaMagnetBootstrap {
         guard didStart else { return }
         didStart = false
         logger.info("IinaMagnetBootstrap.shutdown")
+    }
+
+    /// Opens the media-library window. The entry point lives on iina's initial
+    /// (launch) window — a button below the build badge — which calls this.
+    public static func openLibrary() {
+        WindowFactory.shared.open(.library, title: "媒体库",
+                                  contentSize: .init(width: 1100, height: 720)) {
+            LibraryWindowView()
+                .modelContainer(PersistenceController.shared.container)
+        }
     }
 
     // MARK: - Watch progress (Issue 17)
@@ -74,35 +83,6 @@ public enum IinaMagnetBootstrap {
         logger.info("watch-progress tracking active")
     }
 
-    // MARK: - Menu installation
-
-    /// Adds the media-library entry to the IINA application menu, directly above
-    /// "About IINA" (Phase 3: the library is the app's headline feature, no longer
-    /// buried in a submenu). Disclaimer stays auto-presented on first launch.
-    private static func installLibraryMenuEntry() {
-        guard let appMenu = NSApp.mainMenu?.items.first?.submenu else {
-            logger.warning("app menu unavailable at start; cannot install library entry")
-            return
-        }
-        // Idempotency.
-        if appMenu.items.contains(where: { $0.title == "媒体库…" }) { return }
-
-        let item = NSMenuItem(title: "媒体库…",
-                              action: #selector(MagnetMenuActions.showLibrary(_:)),
-                              keyEquivalent: "l")
-        item.keyEquivalentModifierMask = [.command, .shift]
-        item.target = MagnetMenuActions.shared
-
-        // Insert above "About IINA" — the About item is the app menu's first item.
-        let aboutIdx = appMenu.items.firstIndex { $0.action == Selector(("orderFrontAboutPanel:"))
-            || $0.action == #selector(NSApplication.orderFrontStandardAboutPanel(_:))
-            || $0.title.localizedCaseInsensitiveContains("About")
-            || $0.title.contains("关于") } ?? 0
-        appMenu.insertItem(item, at: aboutIdx)
-        appMenu.insertItem(.separator(), at: aboutIdx + 1)
-        logger.info("media-library menu entry installed above About at index \(aboutIdx)")
-    }
-
     // MARK: - Disclaimer
 
     private static func presentDisclaimerIfNeeded() {
@@ -128,51 +108,5 @@ public enum IinaMagnetBootstrap {
         // iina starts other windows asynchronously and we'd deadlock.
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-    }
-}
-
-// MARK: - Menu action dispatcher
-
-/// Holds the @objc selectors NSMenuItem needs to dispatch into.
-/// Phase 1 issues 14/15/16 will replace placeholder bodies with real window openers.
-@MainActor
-final class MagnetMenuActions: NSObject {
-
-    static let shared = MagnetMenuActions()
-    private static let logger = Logger(subsystem: "iina-magnet", category: "menu")
-
-    @objc func showLibrary(_ sender: Any?) {
-        WindowFactory.shared.open(.library, title: "媒体库",
-                                  contentSize: .init(width: 1100, height: 720)) {
-            LibraryWindowView()
-                .modelContainer(PersistenceController.shared.container)
-        }
-    }
-
-    @objc func showDisclaimer(_ sender: Any?) {
-        let coordinator = DisclaimerCoordinator(context: PersistenceController.shared.container.mainContext)
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 600),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Disclaimer"
-        window.center()
-        window.isReleasedWhenClosed = false
-        let hosting = NSHostingController(rootView: DisclaimerSheet(coordinator: coordinator) {
-            window.close()
-        })
-        window.contentViewController = hosting
-        window.makeKeyAndOrderFront(nil)
-    }
-
-    private func placeholder(name: String) {
-        Self.logger.info("\(name) menu item clicked — placeholder; real implementation in subsequent issues")
-        let alert = NSAlert()
-        alert.messageText = "\(name) — Coming soon"
-        alert.informativeText = "This window is implemented by a later Phase 1 issue. The Magnet menu and Disclaimer flow are working as a Phase 0 milestone."
-        alert.alertStyle = .informational
-        alert.runModal()
     }
 }
