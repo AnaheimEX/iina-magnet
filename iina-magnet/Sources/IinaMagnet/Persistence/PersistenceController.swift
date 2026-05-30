@@ -32,19 +32,15 @@ public final class PersistenceController {
     public let container: ModelContainer
 
     private init(inMemory: Bool) {
-        // Schema grows per issue:
-        //   - Issue 02: DisclaimerAcceptance
-        //   - Issue 10: SubscriptionSource / SubscriptionRule / FeedItem
-        //   - Issue 06: TorrentTask
-        //   - Phase 2: Title / Season / Episode / VersionFile / Tag / WatchProgress
+        // Schema:
+        //   - Disclaimer: DisclaimerAcceptance
+        //   - Phase 2: media library (Title / Season / Episode / VersionFile / Tag /
+        //     WatchProgress / MetadataCache / Credit)
+        // Phase 1 BT/RSS models (TorrentTask / SubscriptionSource / SubscriptionRule
+        // / FeedItem) were removed in Phase 3; SwiftData drops their tables via
+        // lightweight migration.
         let schema = Schema([
             DisclaimerAcceptance.self,
-            TorrentTask.self,
-            SubscriptionSource.self,
-            SubscriptionRule.self,
-            FeedItem.self,
-            // Phase 2 (Issue 01): media library. Additive — Phase 1 stores open
-            // unchanged via SwiftData lightweight migration.
             Title.self,
             Season.self,
             Episode.self,

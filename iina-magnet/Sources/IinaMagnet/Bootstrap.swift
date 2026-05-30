@@ -34,18 +34,9 @@ public enum IinaMagnetBootstrap {
         didStart = true
         logger.info("IinaMagnetBootstrap.start")
 
-        installMagnetMenu()
+        installLibraryMenuEntry()
         presentDisclaimerIfNeeded()
         startWatchProgressTracking()
-
-        // Phase 1: bring up the actor pipeline in dependency order.
-        // CompletionPipeline subscribes to TorrentManager.events; subscribe BEFORE
-        // any torrents can be added so we don't miss early finished events.
-        Task {
-            await TorrentManager.shared.start()
-            await CompletionPipeline.shared.start()
-            await SubscriptionScheduler.shared.start()
-        }
     }
 
     /// Called from `AppDelegate.applicationWillTerminate`.
@@ -54,15 +45,6 @@ public enum IinaMagnetBootstrap {
         guard didStart else { return }
         didStart = false
         logger.info("IinaMagnetBootstrap.shutdown")
-        // Synchronous shutdown so we don't race app exit; block briefly for the actors.
-        let sema = DispatchSemaphore(value: 0)
-        Task {
-            await SubscriptionScheduler.shared.shutdown()
-            await CompletionPipeline.shared.shutdown()
-            await TorrentManager.shared.shutdown()
-            sema.signal()
-        }
-        _ = sema.wait(timeout: .now() + 3)
     }
 
     // MARK: - Watch progress (Issue 17)
@@ -94,55 +76,31 @@ public enum IinaMagnetBootstrap {
 
     // MARK: - Menu installation
 
-    private static func installMagnetMenu() {
-        guard let mainMenu = NSApp.mainMenu else {
-            logger.warning("NSApp.mainMenu nil at start; cannot install Magnet menu")
+    /// Adds the media-library entry to the IINA application menu, directly above
+    /// "About IINA" (Phase 3: the library is the app's headline feature, no longer
+    /// buried in a submenu). Disclaimer stays auto-presented on first launch.
+    private static func installLibraryMenuEntry() {
+        guard let appMenu = NSApp.mainMenu?.items.first?.submenu else {
+            logger.warning("app menu unavailable at start; cannot install library entry")
             return
         }
+        // Idempotency.
+        if appMenu.items.contains(where: { $0.title == "媒体库…" }) { return }
 
-        // Idempotency: only install once even if start() is invoked twice in dev.
-        if mainMenu.items.contains(where: { $0.title == "Magnet" }) {
-            return
-        }
-
-        let magnetItem = NSMenuItem(title: "Magnet", action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: "Magnet")
-
-        submenu.addItem(menuItem(title: "RSS Manager…",
-                                 action: #selector(MagnetMenuActions.showRssManager(_:)),
-                                 keyEquivalent: "r", modifiers: [.command, .shift]))
-        submenu.addItem(menuItem(title: "BT Manager…",
-                                 action: #selector(MagnetMenuActions.showBtManager(_:)),
-                                 keyEquivalent: "b", modifiers: [.command, .shift]))
-        submenu.addItem(menuItem(title: "Library…",
-                                 action: #selector(MagnetMenuActions.showLibrary(_:)),
-                                 keyEquivalent: "l", modifiers: [.command, .shift]))
-        submenu.addItem(.separator())
-        submenu.addItem(menuItem(title: "Settings…",
-                                 action: #selector(MagnetMenuActions.showSettings(_:)),
-                                 keyEquivalent: ""))
-        submenu.addItem(menuItem(title: "Disclaimer…",
-                                 action: #selector(MagnetMenuActions.showDisclaimer(_:)),
-                                 keyEquivalent: ""))
-
-        magnetItem.submenu = submenu
-
-        // Insert before "Window" if present, else append.
-        let insertIdx = mainMenu.items.firstIndex { $0.title == "Window" } ?? mainMenu.items.count
-        mainMenu.insertItem(magnetItem, at: insertIdx)
-        logger.info("Magnet menu installed at index \(insertIdx)")
-    }
-
-    private static func menuItem(title: String,
-                                 action: Selector,
-                                 keyEquivalent: String,
-                                 modifiers: NSEvent.ModifierFlags = []) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
-        if !modifiers.isEmpty {
-            item.keyEquivalentModifierMask = modifiers
-        }
+        let item = NSMenuItem(title: "媒体库…",
+                              action: #selector(MagnetMenuActions.showLibrary(_:)),
+                              keyEquivalent: "l")
+        item.keyEquivalentModifierMask = [.command, .shift]
         item.target = MagnetMenuActions.shared
-        return item
+
+        // Insert above "About IINA" — the About item is the app menu's first item.
+        let aboutIdx = appMenu.items.firstIndex { $0.action == Selector(("orderFrontAboutPanel:"))
+            || $0.action == #selector(NSApplication.orderFrontStandardAboutPanel(_:))
+            || $0.title.localizedCaseInsensitiveContains("About")
+            || $0.title.contains("关于") } ?? 0
+        appMenu.insertItem(item, at: aboutIdx)
+        appMenu.insertItem(.separator(), at: aboutIdx + 1)
+        logger.info("media-library menu entry installed above About at index \(aboutIdx)")
     }
 
     // MARK: - Disclaimer
@@ -183,34 +141,11 @@ final class MagnetMenuActions: NSObject {
     static let shared = MagnetMenuActions()
     private static let logger = Logger(subsystem: "iina-magnet", category: "menu")
 
-    @objc func showRssManager(_ sender: Any?) {
-        WindowFactory.shared.open(.rssManager, title: "RSS Manager",
-                                  contentSize: .init(width: 1000, height: 640)) {
-            RssManagerView()
-                .modelContainer(PersistenceController.shared.container)
-        }
-    }
-
-    @objc func showBtManager(_ sender: Any?) {
-        WindowFactory.shared.open(.btManager, title: "BT Manager",
-                                  contentSize: .init(width: 1000, height: 540)) {
-            BtManagerView()
-                .modelContainer(PersistenceController.shared.container)
-        }
-    }
-
     @objc func showLibrary(_ sender: Any?) {
-        WindowFactory.shared.open(.library, title: "Library",
+        WindowFactory.shared.open(.library, title: "媒体库",
                                   contentSize: .init(width: 1100, height: 720)) {
             LibraryWindowView()
                 .modelContainer(PersistenceController.shared.container)
-        }
-    }
-
-    @objc func showSettings(_ sender: Any?) {
-        WindowFactory.shared.open(.settings, title: "Settings",
-                                  contentSize: .init(width: 600, height: 460)) {
-            MagnetSettingsView()
         }
     }
 
