@@ -9,13 +9,47 @@
 import SwiftUI
 import OSLog
 
-/// Pure browsing order: folders first, then case/number-aware name sort.
+/// What to sort the file list by.
+enum PikPakSortKey: String, CaseIterable, Sendable {
+    case name, modified, size
+    var label: String {
+        switch self {
+        case .name:     return "名称"
+        case .modified: return "修改时间"
+        case .size:     return "大小"
+        }
+    }
+}
+
+struct PikPakSort: Equatable, Sendable {
+    var key: PikPakSortKey
+    var ascending: Bool
+    static let `default` = PikPakSort(key: .name, ascending: true)
+}
+
+/// Pure browsing order: folders always first, then the chosen key (with a
+/// natural-name tie-break).
 enum PikPakBrowsing {
-    static func ordered(_ files: [PikPakFile]) -> [PikPakFile] {
+    static func ordered(_ files: [PikPakFile],
+                        by sort: PikPakSort = .default) -> [PikPakFile] {
         files.sorted { a, b in
             if a.isFolder != b.isFolder { return a.isFolder }
+            let order: ComparisonResult
+            switch sort.key {
+            case .name:     order = a.name.localizedStandardCompare(b.name)
+            case .size:     order = compare(a.size, b.size)
+            case .modified: order = compare(a.modifiedTime ?? .distantPast,
+                                            b.modifiedTime ?? .distantPast)
+            }
+            if order != .orderedSame {
+                return sort.ascending ? order == .orderedAscending : order == .orderedDescending
+            }
             return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
+    }
+
+    private static func compare<T: Comparable>(_ a: T, _ b: T) -> ComparisonResult {
+        a < b ? .orderedAscending : (a > b ? .orderedDescending : .orderedSame)
     }
 }
 
@@ -30,6 +64,7 @@ struct PikPakBrowserView: View {
     @State private var phase: Phase = .loading
     @State private var openingID: String?
     @State private var openError: String?
+    @State private var sort: PikPakSort = .default
 
     private var currentID: String { stack.last?.id ?? "" }
 
@@ -45,23 +80,52 @@ struct PikPakBrowserView: View {
     // MARK: Breadcrumb
 
     private var breadcrumb: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(Array(stack.enumerated()), id: \.element) { index, folder in
-                    if index > 0 {
-                        Image(systemName: "chevron.right").font(.system(size: 9))
-                            .foregroundStyle(LibraryTokens.text3)
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(Array(stack.enumerated()), id: \.element) { index, folder in
+                        if index > 0 {
+                            Image(systemName: "chevron.right").font(.system(size: 9))
+                                .foregroundStyle(LibraryTokens.text3)
+                        }
+                        Button(folder.name) { stack = Array(stack.prefix(index + 1)) }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 12, weight: index == stack.count - 1 ? .semibold : .regular))
+                            .foregroundStyle(index == stack.count - 1 ? LibraryTokens.text : LibraryTokens.text2)
+                            .disabled(index == stack.count - 1)
                     }
-                    Button(folder.name) { stack = Array(stack.prefix(index + 1)) }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 12, weight: index == stack.count - 1 ? .semibold : .regular))
-                        .foregroundStyle(index == stack.count - 1 ? LibraryTokens.text : LibraryTokens.text2)
-                        .disabled(index == stack.count - 1)
                 }
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            Spacer(minLength: 8)
+            sortMenu
         }
+        .padding(.horizontal, 14).padding(.vertical, 8)
         .background(LibraryTokens.bg2)
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            ForEach(PikPakSortKey.allCases, id: \.self) { key in
+                Button {
+                    if sort.key == key { sort.ascending.toggle() }
+                    else { sort = PikPakSort(key: key, ascending: key == .name) }
+                } label: {
+                    HStack {
+                        Text(key.label)
+                        if sort.key == key {
+                            Image(systemName: sort.ascending ? "chevron.up" : "chevron.down")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.up.arrow.down").font(.system(size: 11))
+                Text(sort.key.label).font(.system(size: 12))
+            }
+            .foregroundStyle(LibraryTokens.text2)
+        }
+        .menuStyle(.borderlessButton).fixedSize()
     }
 
     // MARK: Content
@@ -101,7 +165,7 @@ struct PikPakBrowserView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 14).padding(.vertical, 6)
                 }
-                ForEach(PikPakBrowsing.ordered(entries)) { file in
+                ForEach(PikPakBrowsing.ordered(entries, by: sort)) { file in
                     row(file)
                 }
             }
@@ -176,7 +240,10 @@ struct PikPakBrowserView: View {
                 openError = "无法连接到 IINA 播放器"
                 return
             }
-            bridge.openForPlayback(url)
+            // Logged so the direct-link host can be added to a Surge rule.
+            Self.logger.info("pikpak playback host: \(url.host ?? "?", privacy: .public)")
+            bridge.openForPlayback(url, options: PlaybackOptions(
+                userAgent: PikPakConfig.web.userAgent, enlargeNetworkCache: true))
         } catch {
             openError = "无法播放「\(file.name)」：\(message(for: error))"
         }

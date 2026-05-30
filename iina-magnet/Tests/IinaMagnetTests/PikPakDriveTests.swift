@@ -100,7 +100,7 @@ private let listJSON = """
         #expect(stub.gets[1].url.query?.contains("page_token=p2") == true)
     }
 
-    @Test func playbackURLPrefersWebContentLink() async throws {
+    @Test func playbackURLFallsBackToWebContentLinkWhenNoMedia() async throws {
         let detail = #"{"id":"file1","name":"ep.mkv","web_content_link":"https://dl/ep.mkv"}"#
         let stub = QueueStub(["/drive/v1/files/file1": [(200, detail)]])
         let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
@@ -108,9 +108,10 @@ private let listJSON = """
         #expect(url.absoluteString == "https://dl/ep.mkv")
     }
 
-    @Test func playbackURLFallsBackToOriginMedia() async throws {
+    @Test func playbackURLPrefersStreamingMediaOverDownload() async throws {
+        // Both a download link and renditions present → use the origin stream.
         let detail = """
-        {"id":"f","name":"ep.mkv","medias":[
+        {"id":"f","name":"ep.mkv","web_content_link":"https://dl/ep.mkv","medias":[
           {"is_default":true,"link":{"url":"https://stream/720"}},
           {"is_origin":true,"link":{"url":"https://stream/origin"}}
         ]}
@@ -177,19 +178,38 @@ private let listJSON = """
 }
 
 @Suite struct PikPakBrowsingTests {
-    private func file(_ id: String, _ name: String, folder: Bool) -> PikPakFile {
-        PikPakFile(id: id, name: name, isFolder: folder, size: 0,
-                   mimeType: nil, thumbnailURL: nil, modifiedTime: nil)
+    private func file(_ id: String, _ name: String, folder: Bool = false,
+                      size: Int64 = 0, modified: Date? = nil) -> PikPakFile {
+        PikPakFile(id: id, name: name, isFolder: folder, size: size,
+                   mimeType: nil, thumbnailURL: nil, modifiedTime: modified)
     }
 
     @Test func foldersFirstThenNaturalNameOrder() {
         let input = [
-            file("1", "ep10.mkv", folder: false),
+            file("1", "ep10.mkv"),
             file("2", "Zeta", folder: true),
-            file("3", "ep2.mkv", folder: false),
+            file("3", "ep2.mkv"),
             file("4", "Anime", folder: true),
         ]
         let ordered = PikPakBrowsing.ordered(input)
         #expect(ordered.map(\.name) == ["Anime", "Zeta", "ep2.mkv", "ep10.mkv"])
+    }
+
+    @Test func sortBySizeDescendingKeepsFoldersFirst() {
+        let input = [
+            file("1", "small.mp4", size: 100),
+            file("2", "Folder", folder: true),
+            file("3", "big.mp4", size: 999),
+        ]
+        let ordered = PikPakBrowsing.ordered(input, by: PikPakSort(key: .size, ascending: false))
+        #expect(ordered.map(\.name) == ["Folder", "big.mp4", "small.mp4"])
+    }
+
+    @Test func sortByModifiedDescending() {
+        let old = Date(timeIntervalSince1970: 1_000)
+        let new = Date(timeIntervalSince1970: 2_000)
+        let input = [file("1", "older.mp4", modified: old), file("2", "newer.mp4", modified: new)]
+        let ordered = PikPakBrowsing.ordered(input, by: PikPakSort(key: .modified, ascending: false))
+        #expect(ordered.map(\.name) == ["newer.mp4", "older.mp4"])
     }
 }
