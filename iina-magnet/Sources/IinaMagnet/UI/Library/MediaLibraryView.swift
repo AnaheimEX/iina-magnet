@@ -38,6 +38,12 @@ public struct MediaLibraryView: View {
     @State private var sort: LibrarySort = .recent
     @State private var viewMode: LibraryViewMode = .grid
     @State private var sidebarOpen = true
+    @State private var sidebarCompact = false
+    @State private var sidebarWidth: CGFloat = LibraryTokens.Spacing.sidebarWidth
+
+    /// Resize bounds for the (expanded) sidebar; compact mode uses a fixed width.
+    private static let sidebarMinWidth: CGFloat = 190
+    private static let sidebarMaxWidth: CGFloat = 420
 
     public init(items: [LibraryItemViewModel],
                 displayState: LibraryDisplayState = .normal,
@@ -73,8 +79,12 @@ public struct MediaLibraryView: View {
                 if sidebarOpen {
                     LibrarySidebar(items: items, counts: counts,
                                    section: $section, selectedTags: $selectedTags,
+                                   compact: sidebarCompact,
                                    onOpenPikPak: onOpenPikPak)
-                    Divider().overlay(LibraryTokens.sep)
+                        .frame(width: sidebarCompact ? LibrarySidebar.compactWidth : sidebarWidth)
+                    ResizableDivider(width: $sidebarWidth,
+                                     range: Self.sidebarMinWidth...Self.sidebarMaxWidth,
+                                     enabled: !sidebarCompact)
                 }
                 content(filtered: filtered)
             }
@@ -90,6 +100,17 @@ public struct MediaLibraryView: View {
             Button { sidebarOpen.toggle() } label: {
                 Image(systemName: "sidebar.left").font(.system(size: 14))
             }.buttonStyle(.plain).foregroundStyle(LibraryTokens.text2)
+                .help("显示 / 隐藏侧栏")
+
+            if sidebarOpen {
+                Button { withAnimation(.easeInOut(duration: 0.18)) { sidebarCompact.toggle() } } label: {
+                    Image(systemName: sidebarCompact
+                          ? "arrow.left.and.line.vertical.and.arrow.right"
+                          : "arrow.right.and.line.vertical.and.arrow.left")
+                        .font(.system(size: 13))
+                }.buttonStyle(.plain).foregroundStyle(LibraryTokens.text2)
+                    .help(sidebarCompact ? "展开侧栏" : "收紧为图标")
+            }
 
             Text(sectionTitle).font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(LibraryTokens.text)
@@ -244,6 +265,43 @@ public struct MediaLibraryView: View {
         case .kind(let k): return k.displayLabel
         case .match(let m): return m == .pendingConfirmation ? "待确认匹配" : m.displayLabel
         }
+    }
+}
+
+// MARK: - Resizable sidebar divider
+
+/// A 1px separator with a wider invisible hit area that drags the sidebar width
+/// within `range`. Shows a left-right resize cursor on hover. When `enabled` is
+/// false (compact mode) it's a plain, non-interactive divider.
+private struct ResizableDivider: View {
+    @Binding var width: CGFloat
+    let range: ClosedRange<CGFloat>
+    var enabled: Bool = true
+
+    @State private var dragBase: CGFloat?
+
+    var body: some View {
+        Divider().overlay(LibraryTokens.sep)
+            .overlay {
+                if enabled {
+                    Color.clear
+                        .frame(width: 10)
+                        .contentShape(Rectangle())
+                        .onHover { inside in
+                            if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                        }
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { v in
+                                    let base = dragBase ?? width
+                                    if dragBase == nil { dragBase = width }
+                                    width = min(max(base + v.translation.width, range.lowerBound),
+                                                range.upperBound)
+                                }
+                                .onEnded { _ in dragBase = nil }
+                        )
+                }
+            }
     }
 }
 

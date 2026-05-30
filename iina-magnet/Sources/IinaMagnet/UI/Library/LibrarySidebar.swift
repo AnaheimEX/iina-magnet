@@ -67,10 +67,14 @@ private extension TagCategory {
 }
 
 struct LibrarySidebar: View {
+    /// Width of the icon-only (compact) sidebar; the host applies it.
+    static let compactWidth: CGFloat = 58
+
     let items: [LibraryItemViewModel]
     let counts: LibraryCounts            // computed once by the host, shared with the stats bar
     @Binding var section: LibrarySection
     @Binding var selectedTags: Set<String>
+    var compact: Bool = false            // icon-only mode (labels/counts/tag groups hidden)
     var onOpenPikPak: () -> Void = {}    // PikPak cloud-drive entry point
 
     @State private var openGroups: Set<TagCategory> = [.genre]
@@ -107,11 +111,11 @@ struct LibrarySidebar: View {
                     }
                 }
 
-                tagGroups
+                if !compact { tagGroups }
             }
-            .padding(12)
+            .padding(compact ? 8 : 12)
         }
-        .frame(width: LibraryTokens.Spacing.sidebarWidth)
+        .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
     }
 
@@ -121,7 +125,7 @@ struct LibrarySidebar: View {
     private func group<Content: View>(header: String? = nil,
                                       @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let header {
+            if let header, !compact {
                 Text(header).font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(LibraryTokens.text3)
                     .padding(.horizontal, 8).padding(.bottom, 2)
@@ -145,19 +149,23 @@ struct LibrarySidebar: View {
             HStack(spacing: 9) {
                 Image(systemName: icon).font(.system(size: 13))
                     .frame(width: 18).foregroundStyle(tint ?? LibraryTokens.text2)
-                Text(label).font(.system(size: 13))
-                    .foregroundStyle(tint ?? LibraryTokens.text)
-                Spacer(minLength: 4)
-                if let count {
-                    Text("\(count)").font(.system(size: 11)).monospacedDigit()
-                        .foregroundStyle(LibraryTokens.text3)
+                if !compact {
+                    Text(label).font(.system(size: 13))
+                        .foregroundStyle(tint ?? LibraryTokens.text)
+                    Spacer(minLength: 4)
+                    if let count {
+                        Text("\(count)").font(.system(size: 11)).monospacedDigit()
+                            .foregroundStyle(LibraryTokens.text3)
+                    }
                 }
             }
-            .padding(.horizontal, 8).padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: compact ? .center : .leading)
+            .padding(.horizontal, compact ? 6 : 8).padding(.vertical, compact ? 7 : 5)
             .background(active ? LibraryTokens.accentSoft : .clear,
                         in: RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
+        .help(compact ? label : "")
     }
 
     // MARK: Tag groups
