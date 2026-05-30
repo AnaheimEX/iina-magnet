@@ -110,6 +110,55 @@ struct WatchProgressTrackerTests {
         #expect(try ctx.fetch(FetchDescriptor<WatchProgress>()).isEmpty)
     }
 
+    @Test("setWatched marks every episode completed; clearing resets to unseen")
+    func markWatchedToggle() throws {
+        let ctx = makeContext()
+        let title = makeShow(episodeCount: 3, ctx: ctx)
+        let writer = WatchProgressWriter(context: ctx)
+
+        let watched = try writer.setWatched(true, for: title)
+        #expect(watched == .completed)
+        #expect(title.watchProgresses.count == 3)
+        #expect(title.watchProgresses.allSatisfy { $0.state == .completed })
+
+        let cleared = try writer.setWatched(false, for: title)
+        #expect(cleared == .unseen)
+        #expect(title.watchProgresses.isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<WatchProgress>()).isEmpty)
+    }
+
+    @Test("aggregateState: all completed→已看, some→在看, none→未看, empty→未看")
+    func aggregateHelper() throws {
+        let ctx = makeContext()
+        let t = makeShow(episodeCount: 2, ctx: ctx)
+        #expect(TitleDerivations.aggregateState(of: t) == .unseen)
+
+        let writer = WatchProgressWriter(context: ctx)
+        _ = try writer.record(url: URL(fileURLWithPath: "/e1.mkv"), positionSec: 100, durationSec: 100, ended: true)
+        #expect(TitleDerivations.aggregateState(of: t) == .inProgress)
+        _ = try writer.record(url: URL(fileURLWithPath: "/e2.mkv"), positionSec: 100, durationSec: 100, ended: true)
+        #expect(TitleDerivations.aggregateState(of: t) == .completed)
+
+        let empty = Title(kind: .tv, titleZh: "空", matchState: .confirmed)
+        ctx.insert(empty)
+        #expect(TitleDerivations.aggregateState(of: empty) == .unseen)
+    }
+
+    @Test("re-scanning a watched show with a new episode drops it back to 在看")
+    func ingestRecomputesAggregate() throws {
+        let ctx = makeContext()
+        let t = makeShow(episodeCount: 1, ctx: ctx)
+        try WatchProgressWriter(context: ctx).setWatched(true, for: t)
+        #expect(t.aggregateState == .completed)
+
+        // A new, unwatched episode appears (e.g. next week's release).
+        let s = try #require(t.seasons.first)
+        let e2 = Episode(number: 2, seasonNumber: 1); e2.season = s; s.episodes.append(e2)
+        ctx.insert(e2)
+        t.aggregateState = TitleDerivations.aggregateState(of: t)
+        #expect(t.aggregateState == .inProgress)
+    }
+
     @Test("tracker debounces frequent samples; seeks and EOF always write")
     func trackerDebounce() async {
         final class Counter: @unchecked Sendable { var n = 0 }

@@ -184,6 +184,34 @@ struct LibraryEditorTests {
         #expect(try ctx.fetch(FetchDescriptor<Title>()).count == 1)
     }
 
+    @Test("re-match prunes stale source-derived tags but keeps file/user tags")
+    func rebindPrunesStaleTags() throws {
+        let ctx = makeContext()
+        let t = Title(kind: .tv, titleZh: "番", releaseYear: 1999,
+                      matchState: .pendingConfirmation)
+        // Old derived tags + a file-derived quality tag + a user tag.
+        let oldYear = Tag(name: "1999", category: .year)
+        let oldGenre = Tag(name: "战争", category: .genre)
+        let quality = Tag(name: "1080p", category: .quality)
+        let userTag = Tag(name: "我的最爱", category: .userDefined)
+        [oldYear, oldGenre, quality, userTag].forEach(ctx.insert)
+        t.tags.append(contentsOf: [oldYear, oldGenre, quality, userTag])
+        ctx.insert(t)
+
+        let details = MetadataDetails(providerId: .bangumi, externalId: "459283",
+                                      titleZh: "葬送的芙莉莲", releaseYear: 2023,
+                                      genres: ["奇幻"])
+        try LibraryEditor(context: ctx).applyRematch(details, to: t)
+
+        let names = Set(t.tags.map(\.name))
+        #expect(!names.contains("1999"))      // stale year pruned
+        #expect(!names.contains("战争"))       // stale genre pruned
+        #expect(names.contains("2023"))       // new year
+        #expect(names.contains("奇幻"))        // new genre
+        #expect(names.contains("1080p"))      // file-derived quality kept
+        #expect(names.contains("我的最爱"))    // user tag kept
+    }
+
     @Test("pendingTitles returns only non-confirmed titles")
     func pendingQueue() throws {
         let ctx = makeContext()

@@ -115,16 +115,21 @@ public struct LibraryEditor {
             }
         }
 
-        // Year / rating / genre / country tags from the new source. File-derived
-        // tags (quality / release group) come from the on-disk files and are
-        // unchanged. NOTE: stale year/rating tags from the previous match are not
-        // pruned — Tags are shared many-to-many, so safe pruning needs reference
-        // counting (follow-up); the new tags are additive here.
+        // Drop the previous match's source-derived tags before re-deriving, so a
+        // re-bind doesn't leave the old year / rating / genre / country behind.
+        // File-derived tags (quality / release group from the on-disk files) and
+        // user tags are kept — only the metadata-sourced categories are replaced.
+        let sourceDerived: Set<TagCategory> = [.year, .ratingBucket, .genre, .country]
+        title.tags.removeAll { sourceDerived.contains($0.category) }
+
         let derived = TagDeriver.derive(year: details.releaseYear, rating: details.rating,
                                         resolution: nil, releaseGroup: nil,
                                         genres: details.genres, countries: details.countries)
         try TagApplier.apply(derived, to: title, context: context)
         CreditApplier.apply(details.cast, to: title, context: context)
+
+        // Episodes/relationships may have changed — keep the tri-state fresh.
+        title.aggregateState = TitleDerivations.aggregateState(of: title)
     }
 
     /// An existing Title (other than `source`) already bound to this record.

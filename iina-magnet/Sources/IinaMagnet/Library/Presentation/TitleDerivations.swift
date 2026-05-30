@@ -54,6 +54,27 @@ enum TitleDerivations {
                                                  durationSec: wp.durationSec))
     }
 
+    /// Tri-state for the whole work: 全 Episode completed → 已看；有 inProgress /
+    /// 部分 completed → 在看；无 → 未看. Pure read; the write paths assign the result
+    /// to `title.aggregateState` so the browser filter (Issue 16) stays fresh.
+    static func aggregateState(of title: Title) -> ProgressState {
+        let episodes = title.seasons.flatMap(\.episodes)
+        guard !episodes.isEmpty else { return .unseen }
+
+        let byEpisode = progressByEpisode(of: title)
+        var completed = 0, started = 0
+        for ep in episodes {
+            switch byEpisode[EpisodeKey(season: ep.seasonNumber, episode: ep.number)]?.state {
+            case .completed:  completed += 1
+            case .inProgress: started += 1
+            default:          break
+            }
+        }
+        if completed == episodes.count { return .completed }
+        if started > 0 || completed > 0 { return .inProgress }
+        return .unseen
+    }
+
     /// Per-episode watch state, keyed (seasonNumber, episodeNumber) — shared
     /// across an episode's versions (PRD US-20).
     static func progressByEpisode(of title: Title) -> [EpisodeKey: WatchProgress] {

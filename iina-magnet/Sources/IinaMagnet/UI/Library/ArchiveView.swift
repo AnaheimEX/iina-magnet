@@ -18,6 +18,7 @@ public struct ArchiveView: View {
     private let onConfirm: () -> Void
     private let onMarkUnmatched: () -> Void
     private let onMatchSheet: () -> Void
+    private let onToggleWatched: (Bool) -> Void
 
     public init(vm: ArchiveViewModel,
                 fileInfo: FileInfo? = nil,
@@ -26,7 +27,8 @@ public struct ArchiveView: View {
                 onReveal: @escaping (ArchiveVersion) -> Void = { _ in },
                 onConfirm: @escaping () -> Void = {},
                 onMarkUnmatched: @escaping () -> Void = {},
-                onMatchSheet: @escaping () -> Void = {}) {
+                onMatchSheet: @escaping () -> Void = {},
+                onToggleWatched: @escaping (Bool) -> Void = { _ in }) {
         self.vm = vm
         self.fileInfo = fileInfo
         self.onBack = onBack
@@ -35,6 +37,7 @@ public struct ArchiveView: View {
         self.onConfirm = onConfirm
         self.onMarkUnmatched = onMarkUnmatched
         self.onMatchSheet = onMatchSheet
+        self.onToggleWatched = onToggleWatched
     }
 
     @State private var seasonIdx = 0
@@ -177,11 +180,17 @@ public struct ArchiveView: View {
             .buttonStyle(.plain)
             .disabled(!vm.isUnmatched && selectedVersionObject == nil)
 
-            Button {} label: {
-                HStack(spacing: 4) { Image(systemName: "checkmark"); Text("标记已看") }
+            if !vm.isUnmatched {
+                let watched = vm.aggregateState == .completed
+                Button { onToggleWatched(!watched) } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: watched ? "checkmark.circle.fill" : "checkmark")
+                        Text(watched ? "标记未看" : "标记已看")
+                    }
                     .font(.system(size: 13)).padding(.horizontal, 12).padding(.vertical, 8)
                     .background(.ultraThinMaterial, in: Capsule()).foregroundStyle(.white)
-            }.buttonStyle(.plain)
+                }.buttonStyle(.plain)
+            }
         }
     }
 

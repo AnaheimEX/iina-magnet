@@ -45,36 +45,36 @@ public struct WatchProgressWriter {
         progress.state = completed ? .completed : .inProgress
         progress.updatedAt = .now
 
-        recomputeAggregate(of: title)
+        title.aggregateState = TitleDerivations.aggregateState(of: title)
+        title.updatedAt = .now
         try context.save()
         return title
     }
 
-    // MARK: - Aggregate tri-state
+    // MARK: - Mark watched / unwatched
 
-    /// 全 Episode completed → 已看；有 inProgress/部分 completed → 在看；无 → 未看.
-    func recomputeAggregate(of title: Title) {
-        let episodes = title.seasons.flatMap(\.episodes)
-        guard !episodes.isEmpty else { title.aggregateState = .unseen; return }
-
-        let byEpisode = TitleDerivations.progressByEpisode(of: title)
-        var completed = 0, started = 0
-        for ep in episodes {
-            let key = TitleDerivations.EpisodeKey(season: ep.seasonNumber, episode: ep.number)
-            switch byEpisode[key]?.state {
-            case .completed:  completed += 1
-            case .inProgress: started += 1
-            default:          break
+    /// Marks every episode of a Title watched (or clears all progress), e.g. the
+    /// archive page's 标记已看 button. Returns the new aggregate state.
+    @discardableResult
+    public func setWatched(_ watched: Bool, for title: Title) throws -> ProgressState {
+        if watched {
+            for season in title.seasons {
+                for ep in season.episodes {
+                    let wp = findOrCreateProgress(title: title, season: ep.seasonNumber, episode: ep.number)
+                    // Completed; keep an end position if we know the duration.
+                    if wp.durationSec > 0 { wp.lastPositionSec = wp.durationSec }
+                    wp.state = .completed
+                    wp.updatedAt = .now
+                }
             }
-        }
-        if completed == episodes.count {
-            title.aggregateState = .completed
-        } else if started > 0 || completed > 0 {
-            title.aggregateState = .inProgress
         } else {
-            title.aggregateState = .unseen
+            for wp in title.watchProgresses { context.delete(wp) }
+            title.watchProgresses.removeAll()
         }
+        title.aggregateState = TitleDerivations.aggregateState(of: title)
         title.updatedAt = .now
+        try context.save()
+        return title.aggregateState
     }
 
     // MARK: - Lookups

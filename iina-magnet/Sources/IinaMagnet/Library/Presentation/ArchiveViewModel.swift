@@ -66,6 +66,7 @@ public struct ArchiveViewModel: Identifiable, Sendable {
     public let backdropURL: URL?
     public let tagNames: [String]
     public let matchState: MatchState
+    public let aggregateState: ProgressState
     public let matchScore: Double
     public let cast: [CastMember]            // empty until the persons API lands
     public let seasons: [ArchiveSeason]      // tv / unknown
@@ -89,6 +90,7 @@ public struct ArchiveViewModel: Identifiable, Sendable {
         self.backdropURL = title.backdropURL
         self.tagNames = title.tags.map(\.name)
         self.matchState = title.matchState
+        self.aggregateState = title.aggregateState
         self.matchScore = title.matchScore
         self.cast = title.credits
             .sorted { $0.order < $1.order }
