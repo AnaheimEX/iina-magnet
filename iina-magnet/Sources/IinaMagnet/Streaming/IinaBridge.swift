@@ -18,6 +18,19 @@ public protocol IinaBridge: AnyObject, Sendable {
 
     /// Current playback position in seconds, nil when not playing or unknown.
     var currentVideoPositionSec: Double? { get }
+
+    /// Registers a handler invoked as playback advances and at end-of-file, so
+    /// the library can record watch progress (Issue 17). `positionSec` /
+    /// `durationSec` are seconds; `ended` is true when the file finished. Called
+    /// on the main actor. The default no-op lets older bridges / tests opt out.
+    func observePlaybackProgress(
+        _ handler: @escaping @MainActor (_ url: URL, _ positionSec: Double,
+                                         _ durationSec: Double, _ ended: Bool) -> Void)
+}
+
+public extension IinaBridge {
+    func observePlaybackProgress(
+        _ handler: @escaping @MainActor (URL, Double, Double, Bool) -> Void) {}
 }
 
 @MainActor

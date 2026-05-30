@@ -21,6 +21,9 @@ public enum IinaMagnetBootstrap {
 
     private static var didStart = false
 
+    /// Retained so its debounce state survives across playback samples (Issue 17).
+    private static var watchTracker: WatchProgressTracker?
+
     /// Called from `AppDelegate.applicationDidFinishLaunching`.
     /// Idempotent — safe to call multiple times.
     public static func start() {
@@ -33,6 +36,7 @@ public enum IinaMagnetBootstrap {
 
         installMagnetMenu()
         presentDisclaimerIfNeeded()
+        startWatchProgressTracking()
 
         // Phase 1: bring up the actor pipeline in dependency order.
         // CompletionPipeline subscribes to TorrentManager.events; subscribe BEFORE
@@ -59,6 +63,33 @@ public enum IinaMagnetBootstrap {
             sema.signal()
         }
         _ = sema.wait(timeout: .now() + 3)
+    }
+
+    // MARK: - Watch progress (Issue 17)
+
+    /// Records playback progress from iina into the library. Debounced in the
+    /// tracker actor; the surviving samples are written on the main context.
+    private static func startWatchProgressTracking() {
+        let tracker = WatchProgressTracker { url, position, duration, ended in
+            let context = PersistenceController.shared.container.mainContext
+            do {
+                try WatchProgressWriter(context: context)
+                    .record(url: url, positionSec: position, durationSec: duration, ended: ended)
+            } catch {
+                logger.error("watch progress write failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        watchTracker = tracker
+
+        guard let bridge = IinaBridgeRegistry.bridge else {
+            logger.notice("no IinaBridge at start; watch-progress tracking inactive")
+            return
+        }
+        bridge.observePlaybackProgress { url, position, duration, ended in
+            Task { await tracker.ingest(url: url, positionSec: position,
+                                        durationSec: duration, ended: ended) }
+        }
+        logger.info("watch-progress tracking active")
     }
 
     // MARK: - Menu installation
