@@ -49,11 +49,32 @@ private final class QueueStub: PikPakHTTPClient, @unchecked Sendable {
     }
 }
 
-private func signedInAuth(_ stub: QueueStub) -> PikPakAuth {
+private func signedInAuth(_ stub: QueueStub,
+                          recapturer: PikPakCaptchaRecapturing = FailingRecapturer()) -> PikPakAuth {
     let session = PikPakSession(accessToken: "acc", refreshToken: "ref", userID: "u-1",
                                deviceID: "0123456789abcdef0123456789abcdef",
                                expiresAt: Date().addingTimeInterval(7200))   // valid
-    return PikPakAuth(config: .web, http: stub, store: InMemoryPikPakTokenStore(session))
+    return PikPakAuth(config: .web, http: stub, store: InMemoryPikPakTokenStore(session),
+                      recapturer: recapturer)
+}
+
+/// Stand-in recapturer that returns a fixed token (no web view in tests).
+private struct StubRecapturer: PikPakCaptchaRecapturing {
+    let token: String
+    let device: String?
+    func recapture(homeURL: URL, userAgent: String,
+                   timeoutSeconds: Double) async throws -> (token: String, deviceID: String?) {
+        (token, device)
+    }
+}
+
+/// Recapturer that always fails — the default, so tests that don't exercise the
+/// re-capture path behave as before (self-sign only).
+private struct FailingRecapturer: PikPakCaptchaRecapturing {
+    func recapture(homeURL: URL, userAgent: String,
+                   timeoutSeconds: Double) async throws -> (token: String, deviceID: String?) {
+        throw PikPakError.captchaRequired("no web view in tests")
+    }
 }
 
 private let listJSON = """
@@ -167,6 +188,45 @@ private let listJSON = """
         #expect(stub.posts.contains { $0.url.path.contains("captcha/init") })
         // The retried GET carried the freshly minted captcha token.
         #expect(stub.gets[1].headers["X-Captcha-Token"] == "ct-9")
+    }
+
+    @Test func recapturesCaptchaWhenSelfSignRejected() async throws {
+        // code 9 → self-signed captcha/init also rejected (rotated salts) →
+        // fall back to a live re-capture, then the retry uses that token.
+        let stub = QueueStub([
+            "/drive/v1/files": [(200, #"{"error":"captcha_invalid","error_code":9}"#), (200, listJSON)],
+            "/v1/shield/captcha/init": [(200, #"{"error":"captcha_invalid_sign","error_code":9}"#)],
+        ])
+        let auth = signedInAuth(stub, recapturer: StubRecapturer(token: "RECAP-LIVE", device: nil))
+        let drive = PikPakDrive(auth: auth, http: stub, config: .web)
+
+        let files = try await drive.list()
+        #expect(files.count == 3)
+        #expect(stub.posts.contains { $0.url.path.contains("captcha/init") })  // self-sign tried
+        #expect(stub.gets.last?.headers["X-Captcha-Token"] == "RECAP-LIVE")    // re-capture used
+    }
+
+    @Test func captchaRequiredWhenBothSelfSignAndRecaptureFail() async {
+        let stub = QueueStub([
+            "/drive/v1/files": [(200, #"{"error":"captcha_invalid","error_code":9}"#)],
+            "/v1/shield/captcha/init": [(200, #"{"error":"x","error_code":9}"#)],
+        ])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)  // FailingRecapturer
+        do {
+            _ = try await drive.list()
+            Issue.record("expected captchaRequired")
+        } catch let PikPakError.captchaRequired(msg) {
+            #expect(msg.contains("重新登录"))
+        } catch { Issue.record("wrong error: \(error)") }
+    }
+
+    @Test func recaptureAdoptsTokenAndUpdatesDeviceID() async throws {
+        let auth = signedInAuth(QueueStub([:]),
+                                recapturer: StubRecapturer(token: "CAP-NEW", device: "newdevice123"))
+        let token = try await auth.recaptureCaptchaToken()
+        #expect(token == "CAP-NEW")
+        #expect(await auth.currentCaptchaToken == "CAP-NEW")
+        #expect(await auth.currentDeviceID == "newdevice123")   // device kept in sync with captcha
     }
 
     @Test func offlineDownloadSavesIntoExistingPackFolder() async throws {

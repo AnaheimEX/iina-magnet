@@ -120,9 +120,11 @@ Not yet done — for future development:
 - [ ] **PikPak cloud files as a first-class library source** — scrape metadata
       for cloud items so they appear in the unified library, not just the file
       browser.
-- [ ] **PikPak captcha auto-refresh** — when the captured captcha token expires
-      and a self-signed re-mint is rejected (rotated salts), the app currently
-      asks the user to re-login. Could silently re-capture via a hidden web view.
+- [x] **PikPak captcha auto-refresh** — when the captured captcha token expires
+      and a self-signed re-mint is rejected (rotated salts), the app now
+      silently re-captures a fresh token from the web client in an offscreen
+      web view (`PikPakCaptchaRecapturer`) before falling back to a re-login
+      prompt.
 - [x] **Mikan save names** — a JS click listener reads the episode title from
       the page DOM (and catches Mikan's `data-clipboard-text` magnet buttons,
       which aren't real links), so saved tasks carry the real title.
