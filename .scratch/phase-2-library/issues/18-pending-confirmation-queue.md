@@ -1,6 +1,6 @@
 # Issue 18 · 待确认队列 UI + 手动改绑
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 5 (待确认 + 验收)
 Created: 2026-05-29
 Updated: 2026-05-29
