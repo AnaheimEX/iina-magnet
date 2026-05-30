@@ -16,6 +16,10 @@ public protocol PikPakHTTPClient: Sendable {
     /// GETs `url` (query already baked in) with `headers`; same non-throwing
     /// status contract as `postJSON`.
     func getJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int)
+
+    /// DELETEs `url` (query already baked in) with `headers`; same non-throwing
+    /// status contract as `postJSON`. Used by the offline-task center.
+    func deleteJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int)
 }
 
 public struct URLSessionPikPakClient: PikPakHTTPClient {
@@ -40,6 +44,14 @@ public struct URLSessionPikPakClient: PikPakHTTPClient {
     public func getJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int) {
         var req = URLRequest(url: url, timeoutInterval: timeoutSeconds)
         req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
+        return try await send(req)
+    }
+
+    public func deleteJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int) {
+        var req = URLRequest(url: url, timeoutInterval: timeoutSeconds)
+        req.httpMethod = "DELETE"
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
         return try await send(req)
