@@ -137,15 +137,40 @@ public struct MikanView: View {
     }
 }
 
+// MARK: - Title cleanup
+
+/// Normalizes a title captured from the Mikan page DOM (a table cell's text)
+/// into a clean, single-line save name. Pure so it's unit-testable without a
+/// web view.
+enum MikanTitle {
+    static func clean(_ raw: String) -> String {
+        let collapsed = raw
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // Cap length so a stray "select-all" capture can't produce an absurd name.
+        return String(collapsed.prefix(300))
+    }
+}
+
 // MARK: - Web view
 
 private struct MikanWebView: NSViewRepresentable {
+    static let messageName = "mikanTorrent"
+
     var onCapture: (_ name: String, _ url: String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture) }
 
     func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView(frame: .zero)
+        let config = WKWebViewConfiguration()
+        let controller = WKUserContentController()
+        controller.add(context.coordinator, name: Self.messageName)
+        controller.addUserScript(WKUserScript(source: Self.clickScript,
+                                              injectionTime: .atDocumentEnd,
+                                              forMainFrameOnly: false))
+        config.userContentController = controller
+
+        let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.load(URLRequest(url: URL(string: "https://mikanani.me/")!))
         return webView
@@ -153,11 +178,57 @@ private struct MikanWebView: NSViewRepresentable {
 
     func updateNSView(_ nsView: WKWebView, context: Context) {}
 
+    static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
+        nsView.configuration.userContentController.removeScriptMessageHandler(forName: messageName)
+    }
+
+    /// Intercepts clicks on magnet / .torrent links — including Mikan's
+    /// `data-clipboard-text` magnet buttons, which aren't hrefs so navigation
+    /// interception alone would miss them — and reports the link plus the
+    /// episode title read from the surrounding table row.
+    private static let clickScript = """
+    (function() {
+      function titleFor(el) {
+        var row = el.closest('tr');
+        if (row) {
+          var cell = row.querySelector('td');
+          var t = (cell && cell.innerText || '').trim();
+          if (t) return t.split('\\n')[0].trim();
+        }
+        var header = document.querySelector('.bangumi-title, p.bangumi-title, .an-text');
+        if (header && header.innerText.trim()) return header.innerText.trim();
+        return (document.title || '').replace(/\\s*[-|]\\s*Mikan.*$/i, '').trim();
+      }
+      document.addEventListener('click', function(e) {
+        var a = e.target.closest('a[data-clipboard-text^="magnet:"], a[href^="magnet:"], a[href$=".torrent"]');
+        if (!a) return;
+        var url = a.getAttribute('data-clipboard-text') || a.href;
+        if (!url) return;
+        if (url.indexOf('magnet:') === 0 || /\\.torrent($|\\?)/.test(url)) {
+          e.preventDefault();
+          window.webkit.messageHandlers.mikanTorrent.postMessage({ name: titleFor(a), url: url });
+        }
+      }, true);
+    })();
+    """
+
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         private let onCapture: (_ name: String, _ url: String) -> Void
         init(onCapture: @escaping (_ name: String, _ url: String) -> Void) { self.onCapture = onCapture }
 
+        // Primary path: the injected click listener posts {name, url}.
+        func userContentController(_ controller: WKUserContentController,
+                                   didReceive message: WKScriptMessage) {
+            guard message.name == MikanWebView.messageName,
+                  let body = message.body as? [String: Any],
+                  let url = (body["url"] as? String)?.trimmingCharacters(in: .whitespaces),
+                  !url.isEmpty else { return }
+            let name = MikanTitle.clean(body["name"] as? String ?? "")
+            onCapture(name, url)
+        }
+
+        // Fallback: a plain navigation to a magnet / .torrent link (no JS).
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard let url = navigationAction.request.url else { decisionHandler(.allow); return }

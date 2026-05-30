@@ -123,8 +123,9 @@ Not yet done — for future development:
 - [ ] **PikPak captcha auto-refresh** — when the captured captcha token expires
       and a self-signed re-mint is rejected (rotated salts), the app currently
       asks the user to re-login. Could silently re-capture via a hidden web view.
-- [ ] **Mikan save names** — pull the episode title from the page DOM for nicer
-      task names / richer confirmation, beyond what PikPak resolves.
+- [x] **Mikan save names** — a JS click listener reads the episode title from
+      the page DOM (and catches Mikan's `data-clipboard-text` magnet buttons,
+      which aren't real links), so saved tasks carry the real title.
 - [ ] **Crisper scaling (optional)** — the window uses a uniform `scaleEffect`,
       which slightly softens text at higher factors; true size scaling would be
       sharper but touches many hard-coded sizes.
