@@ -18,12 +18,19 @@ final class IinaMagnetBridgeImpl: NSObject, IinaBridge {
     static let shared = IinaMagnetBridgeImpl()
 
     func openForPlayback(_ url: URL) {
-        PlayerCore.active.openURL(url)
+        let player = PlayerCore.active
+        // Restore the stream-probe defaults in case a prior remote stream
+        // tightened them on this shared player core, so local-file format
+        // detection stays robust.
+        player.mpv.setInt(MPVOption.Demuxer.demuxerLavfProbesize, 5_000_000)
+        player.mpv.setDouble(MPVOption.Demuxer.demuxerLavfAnalyzeduration, 0)
+        player.openURL(url)
     }
 
-    /// Applies remote-stream hints (User-Agent + a larger network cache) before
-    /// loading, so PikPak's overseas CDN streams smoothly. Surge (TUN) handles
-    /// the proxy routing by domain rule — nothing proxy-specific here.
+    /// Applies a remote-stream profile (User-Agent + fast start + a generous
+    /// buffer) before loading, so PikPak's overseas CDN starts quickly and then
+    /// plays smoothly. Surge (TUN) handles proxy routing by domain rule —
+    /// nothing proxy-specific here.
     func openForPlayback(_ url: URL, options: PlaybackOptions) {
         let player = PlayerCore.active
         if let userAgent = options.userAgent {
@@ -31,6 +38,18 @@ final class IinaMagnetBridgeImpl: NSObject, IinaBridge {
         }
         if options.enlargeNetworkCache {
             player.mpv.setFlag(MPVOption.Cache.cache, true)
+            // Fast start: begin playing as soon as the first frames arrive
+            // (don't pre-fill the cache) and probe far less of the stream before
+            // deciding its format — the biggest first-frame win on a
+            // high-latency link. PikPak serves standard MP4/MKV, so a short
+            // probe is enough.
+            player.mpv.setFlag(MPVOption.Cache.cachePauseInitial, false)
+            player.mpv.setInt(MPVOption.Demuxer.demuxerLavfProbesize, 2 * 1024 * 1024)   // 2 MiB
+            player.mpv.setDouble(MPVOption.Demuxer.demuxerLavfAnalyzeduration, 1)        // 1 s
+            // Don't hang indefinitely on a stalled connection.
+            player.mpv.setInt(MPVOption.Network.networkTimeout, 60)
+            // Generous demuxer buffer for smooth playback once started (filled
+            // in the background; does not delay the first frame).
             player.mpv.setInt(MPVOption.Demuxer.demuxerMaxBytes, 256 * 1024 * 1024)      // 256 MiB
             player.mpv.setInt(MPVOption.Demuxer.demuxerMaxBackBytes, 64 * 1024 * 1024)   // 64 MiB
             player.mpv.setDouble(MPVOption.Demuxer.demuxerReadaheadSecs, 60)
