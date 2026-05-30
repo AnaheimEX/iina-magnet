@@ -114,8 +114,9 @@ re-watched, so it is deliberately *not* brought into the library):
 - [x] **Faster "find a file"** — the PikPak browser caches folder listings
       (instant back-navigation, easier on the rate limit) and has an instant
       in-folder filter box + refresh button.
-- [ ] **Faster "click → playing"** — prefetch / cache the playback URL so the
-      pre-roll round-trip overlaps user intent.
+- [x] **Faster "click → playing"** — the playback URL is prefetched on row
+      hover and served from a short-lived cache, so the click→play handoff skips
+      the detail round-trip.
 - [ ] **Faster first frame** — retune the remote-playback mpv profile for quick
       start (the current large readahead favours smoothness over startup).
 
