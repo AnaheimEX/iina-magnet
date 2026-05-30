@@ -117,8 +117,11 @@ re-watched, so it is deliberately *not* brought into the library):
 - [x] **Faster "click → playing"** — the playback URL is prefetched on row
       hover and served from a short-lived cache, so the click→play handoff skips
       the detail round-trip.
-- [ ] **Faster first frame** — retune the remote-playback mpv profile for quick
-      start (the current large readahead favours smoothness over startup).
+- [x] **Faster first frame** — the remote-playback mpv profile now starts
+      without pre-filling the cache and probes far less of the stream before
+      deciding its format (the big first-frame win on a high-latency link),
+      while keeping the generous buffer for smoothness. Probe defaults are
+      restored for local files. *Worth A/B-ing on your machine.*
 
 Lower priority (local library is only used occasionally; cloud is watch-once):
 
