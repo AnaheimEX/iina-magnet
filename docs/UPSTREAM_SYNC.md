@@ -30,7 +30,7 @@
 | --- | --- |
 | `iina-magnet/` | 全部自定义功能所在的 SPM 包（库 + 测试 + bridge） |
 | `iina/IinaMagnetBridge.swift` | iina 侧实现 `IinaBridge`（播放/进度/网络选项） |
-| `lib/anitomy/`、`lib/libtorrent/` | 两个 C++ bridge 的 vendored 源 |
+| `lib/anitomy/` | Anitomy C++ bridge 的 vendored 源（文件名解析） |
 | `other/iina-magnet-link.rb` | fork 辅助脚本 |
 | `.github/workflows/iina-magnet-package.yml` | 包的 CI |
 | `README.iina-magnet.md`、`docs/`（本文件等） | fork 文档 |
