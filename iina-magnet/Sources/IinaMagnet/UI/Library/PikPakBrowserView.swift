@@ -51,6 +51,28 @@ enum PikPakBrowsing {
     private static func compare<T: Comparable>(_ a: T, _ b: T) -> ComparisonResult {
         a < b ? .orderedAscending : (a > b ? .orderedDescending : .orderedSame)
     }
+
+    /// Instant in-folder filter: case- and diacritic-insensitive substring on
+    /// the file name. Empty query returns everything unchanged.
+    static func filtered(_ files: [PikPakFile], query: String) -> [PikPakFile] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return files }
+        return files.filter {
+            $0.name.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
+    }
+}
+
+/// Session-lived cache of folder listings, keyed by folder id, so navigating
+/// back into a folder is instant instead of re-fetching from PikPak (which also
+/// spares the rate limit). Refresh forces a re-fetch.
+final class PikPakListingCache {
+    private var byFolder: [String: [PikPakFile]] = [:]
+
+    func entries(for folderID: String) -> [PikPakFile]? { byFolder[folderID] }
+    func store(_ files: [PikPakFile], for folderID: String) { byFolder[folderID] = files }
+    func invalidate(_ folderID: String) { byFolder[folderID] = nil }
+    func invalidateAll() { byFolder.removeAll() }
 }
 
 struct PikPakBrowserView: View {
@@ -65,8 +87,16 @@ struct PikPakBrowserView: View {
     @State private var openingID: String?
     @State private var openError: String?
     @State private var sort: PikPakSort = .default
+    @State private var query = ""
+    @State private var cache = PikPakListingCache()
 
     private var currentID: String { stack.last?.id ?? "" }
+
+    /// What the list actually renders: current folder, filtered by the search
+    /// box then ordered by the chosen sort.
+    private var visibleEntries: [PikPakFile] {
+        PikPakBrowsing.ordered(PikPakBrowsing.filtered(entries, query: query), by: sort)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,7 +104,9 @@ struct PikPakBrowserView: View {
             Divider().overlay(LibraryTokens.sep)
             content
         }
-        .task(id: currentID) { await load() }
+        // New folder → drop any stale filter, then load (cache makes back-nav
+        // instant).
+        .task(id: currentID) { query = ""; await load() }
     }
 
     // MARK: Breadcrumb
@@ -97,10 +129,34 @@ struct PikPakBrowserView: View {
                 }
             }
             Spacer(minLength: 8)
+            searchField
+            Button { Task { await load(force: true) } } label: {
+                Image(systemName: "arrow.clockwise").font(.system(size: 12))
+            }
+            .buttonStyle(.plain).foregroundStyle(LibraryTokens.text2).help("刷新")
             sortMenu
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .background(LibraryTokens.bg2)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass").font(.system(size: 11))
+                .foregroundStyle(LibraryTokens.text3)
+            TextField("筛选当前文件夹", text: $query)
+                .textFieldStyle(.plain).font(.system(size: 12))
+                .foregroundStyle(LibraryTokens.text)
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 11))
+                }
+                .buttonStyle(.plain).foregroundStyle(LibraryTokens.text3)
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .frame(width: 180)
+        .background(LibraryTokens.bg, in: RoundedRectangle(cornerRadius: 6))
     }
 
     private var sortMenu: some View {
@@ -145,11 +201,13 @@ struct PikPakBrowserView: View {
                     Button("重试") { Task { await load() } }.controlSize(.small)
                 }
             }
-        case .loaded where entries.isEmpty:
+        case .loaded where visibleEntries.isEmpty:
             centered {
                 VStack(spacing: 8) {
-                    Image(systemName: "folder").font(.system(size: 30)).foregroundStyle(LibraryTokens.text3)
-                    Text("这个文件夹是空的").font(.system(size: 13)).foregroundStyle(LibraryTokens.text2)
+                    Image(systemName: query.isEmpty ? "folder" : "magnifyingglass")
+                        .font(.system(size: 30)).foregroundStyle(LibraryTokens.text3)
+                    Text(query.isEmpty ? "这个文件夹是空的" : "没有匹配「\(query)」的文件")
+                        .font(.system(size: 13)).foregroundStyle(LibraryTokens.text2)
                 }
             }
         case .loaded:
@@ -165,7 +223,7 @@ struct PikPakBrowserView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 14).padding(.vertical, 6)
                 }
-                ForEach(PikPakBrowsing.ordered(entries, by: sort)) { file in
+                ForEach(visibleEntries) { file in
                     row(file)
                 }
             }
@@ -216,11 +274,19 @@ struct PikPakBrowserView: View {
     // MARK: Actions
 
     @MainActor
-    private func load() async {
-        phase = .loading
+    private func load(force: Bool = false) async {
         openError = nil
+        // Serve a cached listing instantly (instant back-navigation); `force`
+        // (the refresh button) bypasses it.
+        if !force, let cached = cache.entries(for: currentID) {
+            entries = cached
+            phase = .loaded
+            return
+        }
+        phase = .loading
         do {
             let files = try await PikPakDrive.shared.list(parentID: currentID)
+            cache.store(files, for: currentID)
             entries = files
             phase = .loaded
         } catch {

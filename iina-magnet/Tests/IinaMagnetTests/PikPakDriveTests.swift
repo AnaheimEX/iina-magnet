@@ -392,4 +392,28 @@ private let listJSON = """
         let ordered = PikPakBrowsing.ordered(input, by: PikPakSort(key: .modified, ascending: false))
         #expect(ordered.map(\.name) == ["newer.mp4", "older.mp4"])
     }
+
+    @Test func filterIsCaseAndDiacriticInsensitiveSubstring() {
+        let input = [
+            file("1", "葬送的芙莉莲 01.mkv"),
+            file("2", "[Sakurato] Frieren 02.mkv"),
+            file("3", "药屋少女 05.mp4"),
+        ]
+        #expect(PikPakBrowsing.filtered(input, query: "frieren").map(\.id) == ["2"])
+        #expect(PikPakBrowsing.filtered(input, query: "芙莉莲").map(\.id) == ["1"])
+        #expect(PikPakBrowsing.filtered(input, query: "  ").map(\.id) == ["1", "2", "3"])  // blank → all
+        #expect(PikPakBrowsing.filtered(input, query: "无此").isEmpty)
+    }
+
+    @Test func cacheRoundTripsAndInvalidates() {
+        let cache = PikPakListingCache()
+        #expect(cache.entries(for: "f1") == nil)
+        cache.store([file("a", "a.mp4")], for: "f1")
+        #expect(cache.entries(for: "f1")?.map(\.id) == ["a"])
+        cache.invalidate("f1")
+        #expect(cache.entries(for: "f1") == nil)
+        cache.store([file("b", "b.mp4")], for: "f1")
+        cache.invalidateAll()
+        #expect(cache.entries(for: "f1") == nil)
+    }
 }
