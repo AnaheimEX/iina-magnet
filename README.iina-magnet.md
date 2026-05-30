@@ -43,10 +43,8 @@ Requirements:
 | macOS | 14.0 (Sonoma) or later |
 
 > The `IinaMagnet` Swift package builds and tests standalone:
-> `cd iina-magnet && swift test`. The `LibtorrentBridge` target is dormant
-> (kept for possible future use); building its tests needs
-> `./lib/libtorrent/build.sh` (one-time, ~7 min, needs Homebrew `cmake` +
-> `openssl@3`). The `AnitomyBridge` target *is* used (filename parsing).
+> `cd iina-magnet && swift test`. It depends on one C++ bridge,
+> `AnitomyBridge` (filename parsing); no external build step is needed.
 
 ---
 
@@ -131,8 +129,9 @@ Not yet done — for future development:
 - [ ] **Crisper scaling (optional)** — the window uses a uniform `scaleEffect`,
       which slightly softens text at higher factors; true size scaling would be
       sharper but touches many hard-coded sizes.
-- [ ] **Trim dormant target (optional)** — remove the unused `LibtorrentBridge`
-      target/lib if BT is never revived.
+- [x] **Trim dormant target** — the unused `LibtorrentBridge` target, its
+      Obj-C++ bridge, and the vendored `lib/libtorrent` have been removed (the
+      project no longer does BT itself; PikPak handles offline downloads).
 
 ---
 
