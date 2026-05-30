@@ -21,6 +21,23 @@ final class IinaMagnetBridgeImpl: NSObject, IinaBridge {
         PlayerCore.active.openURL(url)
     }
 
+    /// Applies remote-stream hints (User-Agent + a larger network cache) before
+    /// loading, so PikPak's overseas CDN streams smoothly. Surge (TUN) handles
+    /// the proxy routing by domain rule — nothing proxy-specific here.
+    func openForPlayback(_ url: URL, options: PlaybackOptions) {
+        let player = PlayerCore.active
+        if let userAgent = options.userAgent {
+            _ = player.mpv.setString(MPVOption.Network.userAgent, userAgent)
+        }
+        if options.enlargeNetworkCache {
+            player.mpv.setFlag(MPVOption.Cache.cache, true)
+            player.mpv.setInt(MPVOption.Demuxer.demuxerMaxBytes, 256 * 1024 * 1024)      // 256 MiB
+            player.mpv.setInt(MPVOption.Demuxer.demuxerMaxBackBytes, 64 * 1024 * 1024)   // 64 MiB
+            player.mpv.setDouble(MPVOption.Demuxer.demuxerReadaheadSecs, 60)
+        }
+        player.openURL(url)
+    }
+
     var currentVideoPositionSec: Double? {
         PlayerCore.active.info.videoPosition?.second
     }

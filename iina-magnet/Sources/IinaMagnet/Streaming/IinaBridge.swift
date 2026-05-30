@@ -11,10 +11,29 @@
 
 import Foundation
 
+/// Extra mpv hints for a playback request. Used for remote (PikPak) streams:
+/// a larger network cache smooths buffering and a User-Agent avoids CDN
+/// throttling. Local library playback ignores these.
+public struct PlaybackOptions: Sendable {
+    public var userAgent: String?
+    /// Enlarge mpv's demuxer / network cache for smoother remote streaming.
+    public var enlargeNetworkCache: Bool
+
+    public init(userAgent: String? = nil, enlargeNetworkCache: Bool = false) {
+        self.userAgent = userAgent
+        self.enlargeNetworkCache = enlargeNetworkCache
+    }
+}
+
 @MainActor
 public protocol IinaBridge: AnyObject, Sendable {
     /// Asks iina to start playing the given URL in its current PlayerCore.
     func openForPlayback(_ url: URL)
+
+    /// Plays `url` applying `options` (network cache / User-Agent). The default
+    /// ignores options and calls `openForPlayback(_:)`, so existing bridges and
+    /// test mocks keep working unchanged.
+    func openForPlayback(_ url: URL, options: PlaybackOptions)
 
     /// Current playback position in seconds, nil when not playing or unknown.
     var currentVideoPositionSec: Double? { get }
@@ -29,6 +48,8 @@ public protocol IinaBridge: AnyObject, Sendable {
 }
 
 public extension IinaBridge {
+    func openForPlayback(_ url: URL, options: PlaybackOptions) { openForPlayback(url) }
+
     func observePlaybackProgress(
         _ handler: @escaping @MainActor (URL, Double, Double, Bool) -> Void) {}
 }

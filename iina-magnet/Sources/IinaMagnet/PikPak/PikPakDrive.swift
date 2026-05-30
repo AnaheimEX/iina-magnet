@@ -196,15 +196,17 @@ struct PPFile: Decodable {
                    modifiedTime: PPFile.date(from: modified_time))
     }
 
-    /// Original download link first (best quality for mpv), else a transcoded
-    /// media link — preferring the origin, then the default, then any.
+    /// Prefer a streaming `medias` link (what PikPak's own player uses — it
+    /// starts faster than the raw download URL): origin first to keep original
+    /// quality, then the default rendition, then any. Falls back to
+    /// `web_content_link` when the file has no media renditions.
     var bestPlaybackURL: URL? {
-        if let link = web_content_link?.nonEmpty, let url = URL(string: link) { return url }
         let candidates = medias ?? []
-        let pick = candidates.first(where: { $0.is_origin == true })
-            ?? candidates.first(where: { $0.is_default == true })
+        let pick = candidates.first(where: { $0.is_origin == true && $0.link?.url?.nonEmpty != nil })
+            ?? candidates.first(where: { $0.is_default == true && $0.link?.url?.nonEmpty != nil })
             ?? candidates.first(where: { $0.link?.url?.nonEmpty != nil })
         if let s = pick?.link?.url?.nonEmpty, let url = URL(string: s) { return url }
+        if let link = web_content_link?.nonEmpty, let url = URL(string: link) { return url }
         return nil
     }
 
