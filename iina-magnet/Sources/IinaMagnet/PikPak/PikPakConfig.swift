@@ -25,16 +25,20 @@ public struct PikPakConfig: Sendable {
     public var captchaSalts: [String]
     public var userAgent: String
 
-    // Endpoints (auth lives on the `.net` host; the drive API is `.com`).
+    // Endpoints. Auth + drive both use the `.net` mirror (as the alist driver
+    // does); the same backend serves `.com`.
     public var captchaInitURL: URL
     public var signInURL: URL
     public var tokenURL: URL
+    /// Base of the drive API, e.g. `https://api-drive.mypikpak.net`.
+    public var driveBaseURL: URL
     /// Sent in the captcha-init request; a fixed constant from the web client.
     public var redirectURI: String
 
     public init(clientID: String, clientSecret: String, clientVersion: String,
                 packageName: String, captchaSalts: [String], userAgent: String,
-                captchaInitURL: URL, signInURL: URL, tokenURL: URL, redirectURI: String) {
+                captchaInitURL: URL, signInURL: URL, tokenURL: URL,
+                driveBaseURL: URL, redirectURI: String) {
         self.clientID = clientID
         self.clientSecret = clientSecret
         self.clientVersion = clientVersion
@@ -44,6 +48,7 @@ public struct PikPakConfig: Sendable {
         self.captchaInitURL = captchaInitURL
         self.signInURL = signInURL
         self.tokenURL = tokenURL
+        self.driveBaseURL = driveBaseURL
         self.redirectURI = redirectURI
     }
 
@@ -75,5 +80,6 @@ public struct PikPakConfig: Sendable {
         captchaInitURL: URL(string: "https://user.mypikpak.net/v1/shield/captcha/init")!,
         signInURL: URL(string: "https://user.mypikpak.net/v1/auth/signin")!,
         tokenURL: URL(string: "https://user.mypikpak.net/v1/auth/token")!,
+        driveBaseURL: URL(string: "https://api-drive.mypikpak.net")!,
         redirectURI: "xlaccsdk01://xbase.cloud/callback?state=harbor")
 }

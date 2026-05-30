@@ -12,6 +12,10 @@ public protocol PikPakHTTPClient: Sendable {
     /// data and HTTP status. A non-2xx status is NOT thrown — the caller
     /// decodes PikPak's error envelope to surface a precise message.
     func postJSON(_ url: URL, body: Data, headers: [String: String]) async throws -> (Data, Int)
+
+    /// GETs `url` (query already baked in) with `headers`; same non-throwing
+    /// status contract as `postJSON`.
+    func getJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int)
 }
 
 public struct URLSessionPikPakClient: PikPakHTTPClient {
@@ -30,6 +34,18 @@ public struct URLSessionPikPakClient: PikPakHTTPClient {
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
 
+        return try await send(req)
+    }
+
+    public func getJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int) {
+        var req = URLRequest(url: url, timeoutInterval: timeoutSeconds)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
+        return try await send(req)
+    }
+
+    private func send(_ req: URLRequest) async throws -> (Data, Int) {
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else {

@@ -26,6 +26,9 @@ public actor PikPakAuth {
     private let http: PikPakHTTPClient
     private let store: PikPakTokenStore
     private var session: PikPakSession?
+    /// Last captcha token minted for drive calls (PikPak issues these per
+    /// action; re-minted lazily when a call reports it expired).
+    private var driveCaptchaToken = ""
 
     public init(config: PikPakConfig = .web,
                 http: PikPakHTTPClient = URLSessionPikPakClient(),
@@ -93,7 +96,56 @@ public actor PikPakAuth {
 
     public func signOut() {
         session = nil
+        driveCaptchaToken = ""
         store.clear()
+    }
+
+    // MARK: - For the drive API
+
+    public var userAgent: String { config.userAgent }
+
+    /// Forces an access-token refresh (used when PikPak rejects a token the
+    /// client still considered valid).
+    public func refreshAccessToken() async throws -> String {
+        guard let current = session else { throw PikPakError.notAuthenticated }
+        let token = try await postRefresh(refreshToken: current.refreshToken)
+        var updated = current
+        updated.accessToken = token.access_token
+        updated.refreshToken = token.refresh_token
+        if let sub = token.sub, !sub.isEmpty { updated.userID = sub }
+        updated.expiresAt = Date().addingTimeInterval(TimeInterval(token.expires_in ?? 7200))
+        session = updated
+        store.save(updated)
+        return updated.accessToken
+    }
+
+    /// A captcha token for a drive `action` (e.g. `GET:/drive/v1/files`), signed
+    /// with captcha_sign over the configured salts. Cached; pass `refresh` to
+    /// force a new one (after PikPak reports the token expired).
+    public func captchaToken(forAction action: String, refresh: Bool = false) async throws -> String {
+        if !refresh, !driveCaptchaToken.isEmpty { return driveCaptchaToken }
+        guard let current = session else { throw PikPakError.notAuthenticated }
+
+        let timestamp = PikPakCrypto.timestampMillis()
+        let sign = PikPakCrypto.captchaSign(config: config, deviceID: current.deviceID,
+                                            timestampMillis: timestamp)
+        let meta = ["client_version": config.clientVersion,
+                    "package_name": config.packageName,
+                    "user_id": current.userID,
+                    "timestamp": timestamp,
+                    "captcha_sign": sign]
+        let request = CaptchaInitRequest(action: action, captcha_token: driveCaptchaToken,
+                                         client_id: config.clientID, device_id: current.deviceID,
+                                         meta: meta, redirect_uri: config.redirectURI)
+        let (data, status) = try await post(config.captchaInitURL, body: request,
+                                            headers: headers(deviceID: current.deviceID, captcha: nil))
+        if let error = decodeError(data, status: status) { throw error }
+        let response = try decode(CaptchaInitResponse.self, from: data)
+        guard let token = response.captcha_token, !token.isEmpty else {
+            throw PikPakError.captchaRequired("无法获取验证令牌")
+        }
+        driveCaptchaToken = token
+        return token
     }
 
     // MARK: - Auth steps
