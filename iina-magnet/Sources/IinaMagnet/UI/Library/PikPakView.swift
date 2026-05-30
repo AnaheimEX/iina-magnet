@@ -16,6 +16,7 @@ public struct PikPakView: View {
     @State private var signedIn = false
     @State private var userID: String?
     @State private var showLogin = false
+    @State private var showTasks = false        // 文件浏览 vs 离线任务
 
     public init(onBack: @escaping () -> Void = {}) {
         self.onBack = onBack
@@ -25,7 +26,11 @@ public struct PikPakView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(LibraryTokens.sep)
-            if signedIn { PikPakBrowserView() } else { connectPrompt }
+            if signedIn {
+                if showTasks { PikPakTaskCenterView() } else { PikPakBrowserView() }
+            } else {
+                connectPrompt
+            }
         }
         .background(LibraryTokens.bg)
         .task { await refreshState() }
@@ -60,6 +65,16 @@ public struct PikPakView: View {
             }
             Spacer()
             if signedIn {
+                Button { showTasks.toggle() } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: showTasks ? "folder" : "arrow.down.circle")
+                        Text(showTasks ? "文件" : "离线任务")
+                    }
+                    .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(showTasks ? LibraryTokens.text2 : LibraryTokens.accent)
+                .help(showTasks ? "返回文件浏览" : "查看离线下载任务")
                 Button("退出登录") {
                     Task { await PikPakAuth.shared.signOut(); await refreshState() }
                 }

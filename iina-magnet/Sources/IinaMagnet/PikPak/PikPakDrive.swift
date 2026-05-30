@@ -46,13 +46,35 @@ public struct PikPakFile: Sendable, Identifiable, Equatable {
 }
 
 /// A PikPak offline-download task.
-public struct PikPakTask: Sendable, Equatable {
+public struct PikPakTask: Sendable, Equatable, Identifiable {
     public let id: String
     public let fileID: String
     public let name: String
     public let phase: String        // PHASE_TYPE_RUNNING / _COMPLETE / _PENDING / _ERROR
+    public let progress: Int        // 0...100
+    public let fileSize: Int64
+    public let message: String?     // failure / status detail, when any
+    public let sourceURL: String?   // original magnet / URL, used to retry
+    public let createdTime: Date?
+
+    public init(id: String, fileID: String, name: String, phase: String,
+                progress: Int = 0, fileSize: Int64 = 0, message: String? = nil,
+                sourceURL: String? = nil, createdTime: Date? = nil) {
+        self.id = id
+        self.fileID = fileID
+        self.name = name
+        self.phase = phase
+        self.progress = progress
+        self.fileSize = fileSize
+        self.message = message
+        self.sourceURL = sourceURL
+        self.createdTime = createdTime
+    }
 
     public var isComplete: Bool { phase == "PHASE_TYPE_COMPLETE" }
+    public var isRunning: Bool  { phase == "PHASE_TYPE_RUNNING" }
+    public var isPending: Bool  { phase == "PHASE_TYPE_PENDING" }
+    public var isError: Bool    { phase == "PHASE_TYPE_ERROR" }
 }
 
 // MARK: - Drive client
@@ -167,6 +189,54 @@ public actor PikPakDrive {
         }
     }
 
+    // MARK: - Offline-task center
+
+    /// Lists offline-download tasks in the given phases. Defaults to the
+    /// active / failed set worth surfacing in the task center — completed
+    /// downloads already live in the file browser. Follows pagination.
+    public func tasks(phases: [String] = ["PHASE_TYPE_RUNNING", "PHASE_TYPE_PENDING", "PHASE_TYPE_ERROR"])
+        async throws -> [PikPakTask] {
+        var result: [PikPakTask] = []
+        var pageToken: String? = ""
+        let filter = #"{"phase":{"in":""# + phases.joined(separator: ",") + #""}}"#
+        repeat {
+            let query = [
+                "type": "offline",
+                "thumbnail_size": "SIZE_SMALL",
+                "limit": "100",
+                "filters": filter,
+                "page_token": pageToken ?? "",
+            ]
+            let data = try await authorizedGet(path: "/drive/v1/tasks", query: query)
+            let resp = try decode(PPTasksResponse.self, from: data)
+            result.append(contentsOf: (resp.tasks ?? []).map(\.asTask))
+            let next = resp.next_page_token
+            pageToken = (next?.isEmpty == false) ? next : nil
+        } while pageToken != nil
+        return result
+    }
+
+    /// Removes an offline task. `deleteFiles` also trashes any partial file it
+    /// already produced.
+    public func deleteTask(id: String, deleteFiles: Bool = false) async throws {
+        _ = try await authorizedDelete(path: "/drive/v1/tasks",
+                                       query: ["task_ids": id,
+                                               "delete_files": deleteFiles ? "true" : "false"])
+    }
+
+    /// Retries a failed task by re-submitting its original source URL. PikPak
+    /// has no stable retry endpoint; re-adding the magnet/URL is what its own
+    /// client effectively does (and it dedups server-side). Clears the failed
+    /// task first so it doesn't linger in the list.
+    @discardableResult
+    public func retryTask(_ task: PikPakTask) async throws -> PikPakTask {
+        guard let url = task.sourceURL, !url.isEmpty else {
+            throw PikPakError.api(code: -6, message: "无法重试该任务：缺少原始下载链接")
+        }
+        try? await deleteTask(id: task.id)
+        return try await offlineDownload(url: url)
+    }
+
     // MARK: - Request plumbing
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
@@ -185,6 +255,12 @@ public actor PikPakDrive {
         let action = PikPakCrypto.action(method: "POST", url: url)
         let encoded = try JSONEncoder().encode(body)
         return try await authorized(action: action) { try await self.http.postJSON(url, body: encoded, headers: $0) }
+    }
+
+    private func authorizedDelete(path: String, query: [String: String]) async throws -> Data {
+        let url = buildURL(path: path, query: query)
+        let action = PikPakCrypto.action(method: "DELETE", url: url)
+        return try await authorized(action: action) { try await self.http.deleteJSON(url, headers: $0) }
     }
 
     /// Runs an authorized request, applying PikPak's error-code retry policy
@@ -341,19 +417,38 @@ struct OfflineDownloadResponse: Decodable {
     let task: PPTask?
 }
 
+struct PPTasksResponse: Decodable {
+    let tasks: [PPTask]?
+    let next_page_token: String?
+}
+
 struct PPTask: Decodable {
     let id: String?
     let file_id: String?
     let file_name: String?
     let name: String?
     let phase: String?
+    let progress: Int?
+    let file_size: String?
+    let message: String?
+    let created_time: String?
+    let params: PPTaskParams?
 
     var asTask: PikPakTask {
         PikPakTask(id: id ?? "",
                    fileID: file_id ?? "",
                    name: file_name?.nonEmpty ?? name ?? "",
-                   phase: phase ?? "")
+                   phase: phase ?? "",
+                   progress: progress ?? 0,
+                   fileSize: Int64(file_size ?? "") ?? 0,
+                   message: message?.nonEmpty,
+                   sourceURL: params?.url?.nonEmpty,
+                   createdTime: PPFile.date(from: created_time))
     }
+}
+
+struct PPTaskParams: Decodable {
+    let url: String?
 }
 
 private extension String {

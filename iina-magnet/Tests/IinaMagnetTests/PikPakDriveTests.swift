@@ -18,6 +18,7 @@ private final class QueueStub: PikPakHTTPClient, @unchecked Sendable {
     private var queues: [String: [(status: Int, json: String)]]
     private(set) var gets: [StubReq] = []
     private(set) var posts: [StubReq] = []
+    private(set) var deletes: [StubReq] = []
 
     init(_ queues: [String: [(status: Int, json: String)]]) { self.queues = queues }
 
@@ -40,6 +41,10 @@ private final class QueueStub: PikPakHTTPClient, @unchecked Sendable {
     func postJSON(_ url: URL, body: Data, headers: [String: String]) async throws -> (Data, Int) {
         let text = String(data: body, encoding: .utf8) ?? ""
         lock.withLock { posts.append(StubReq(url: url, headers: headers, body: text)) }
+        return pop(url)
+    }
+    func deleteJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int) {
+        lock.withLock { deletes.append(StubReq(url: url, headers: headers, body: "")) }
         return pop(url)
     }
 }
@@ -204,6 +209,90 @@ private let listJSON = """
             Issue.record("expected api error to be thrown")
         } catch let PikPakError.api(code, _) {
             #expect(code == 10)
+        } catch { Issue.record("wrong error: \(error)") }
+    }
+}
+
+@Suite struct PikPakTaskCenterTests {
+
+    private let tasksJSON = """
+    {"tasks":[
+      {"id":"t1","file_id":"f1","file_name":"番剧 01.mkv","phase":"PHASE_TYPE_RUNNING",
+       "progress":42,"file_size":"123456","params":{"url":"magnet:?xt=urn:btih:ABC"}},
+      {"id":"t2","file_id":"f2","name":"fallback","phase":"PHASE_TYPE_ERROR",
+       "message":"种子无法连接","progress":0}
+    ],"next_page_token":""}
+    """
+
+    @Test func tasksParsePhaseProgressMessageAndSource() async throws {
+        let stub = QueueStub(["/drive/v1/tasks": [(200, tasksJSON)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        let tasks = try await drive.tasks()
+        #expect(tasks.count == 2)
+
+        let running = try #require(tasks.first { $0.id == "t1" })
+        #expect(running.isRunning)
+        #expect(running.progress == 42)
+        #expect(running.fileSize == 123456)
+        #expect(running.name == "番剧 01.mkv")
+        #expect(running.sourceURL == "magnet:?xt=urn:btih:ABC")
+
+        let failed = try #require(tasks.first { $0.id == "t2" })
+        #expect(failed.isError)
+        #expect(failed.message == "种子无法连接")
+        #expect(failed.name == "fallback")        // falls back to `name` when no file_name
+    }
+
+    @Test func tasksRequestCarriesOfflineTypeAndPhaseFilter() async throws {
+        let stub = QueueStub(["/drive/v1/tasks": [(200, #"{"tasks":[],"next_page_token":""}"#)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        _ = try await drive.tasks()
+        let get = try #require(stub.gets.first)
+        let query = get.url.query ?? ""
+        #expect(query.contains("type=offline"))
+        #expect(get.url.path.contains("/drive/v1/tasks"))
+        #expect((get.url.query?.removingPercentEncoding ?? "").contains("PHASE_TYPE_ERROR"))
+    }
+
+    @Test func deleteTaskHitsTasksEndpointWithTaskID() async throws {
+        let stub = QueueStub(["/drive/v1/tasks": [(200, "{}")]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        try await drive.deleteTask(id: "t9")
+        let del = try #require(stub.deletes.first)
+        #expect(del.url.query?.contains("task_ids=t9") == true)
+        #expect(del.url.query?.contains("delete_files=false") == true)
+        #expect(del.headers["Authorization"] == "Bearer acc")
+    }
+
+    @Test func retryClearsOldTaskAndResubmitsSourceURL() async throws {
+        let task = PikPakTask(id: "t1", fileID: "f1", name: "番剧", phase: "PHASE_TYPE_ERROR",
+                              sourceURL: "magnet:?xt=urn:btih:ABC")
+        let folderList = #"{"files":[{"id":"pack1","kind":"drive#folder","name":"Pack From Shared"}],"next_page_token":""}"#
+        let taskResp = #"{"task":{"id":"t2","file_id":"f2","name":"番剧","phase":"PHASE_TYPE_RUNNING"}}"#
+        let stub = QueueStub([
+            "/drive/v1/tasks": [(200, "{}")],                    // delete old
+            "/drive/v1/files": [(200, folderList), (200, taskResp)],  // find folder + add task
+        ])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        let new = try await drive.retryTask(task)
+        #expect(new.fileID == "f2")
+        #expect(stub.deletes.contains { $0.url.query?.contains("task_ids=t1") == true })
+        #expect(stub.posts.last?.body.contains("magnet:?xt=urn:btih:ABC") == true)
+    }
+
+    @Test func retryWithoutSourceURLThrows() async {
+        let task = PikPakTask(id: "t1", fileID: "f1", name: "x", phase: "PHASE_TYPE_ERROR")
+        let stub = QueueStub(["/drive/v1/tasks": [(200, "{}")]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+        do {
+            _ = try await drive.retryTask(task)
+            Issue.record("expected retry to throw without a source URL")
+        } catch let PikPakError.api(code, _) {
+            #expect(code == -6)
         } catch { Issue.record("wrong error: \(error)") }
     }
 }

@@ -105,8 +105,8 @@ contents up so everything stays comfortably clickable.
 
 Shipped and verified: media library (scan / match / archive / watch progress /
 tags / filters), PikPak (web login, browse, sort, cloud play, offline
-download), Mikan → PikPak save & cloud-play, screen-adaptive window scaling,
-upstream-sync tooling.
+download, **offline-task center**), Mikan → PikPak save & cloud-play,
+screen-adaptive window scaling, upstream-sync tooling.
 
 Not yet done — for future development:
 
@@ -114,9 +114,9 @@ Not yet done — for future development:
       non-anime, *Issue 06*) and **Douban** (*Issue 08*).
 - [ ] **Multi-source metadata merge** (*Issue 10*) — combine Bangumi + TMDB +
       Douban into one record instead of a single source.
-- [ ] **PikPak offline-task center** — a view listing running / failed offline
-      tasks with progress, retry and delete (PikPak `drive/v1/tasks` APIs).
-      Currently saving is fire-and-forget (cloud-play polls the file instead).
+- [x] **PikPak offline-task center** — the PikPak screen has a 「离线任务」toggle
+      listing running / pending / failed offline tasks with live progress, retry
+      (re-submits the source URL) and delete (PikPak `drive/v1/tasks` APIs).
 - [ ] **PikPak cloud files as a first-class library source** — scrape metadata
       for cloud items so they appear in the unified library, not just the file
       browser.
