@@ -25,7 +25,7 @@ public struct PikPakView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(LibraryTokens.sep)
-            if signedIn { signedInPlaceholder } else { connectPrompt }
+            if signedIn { PikPakBrowserView() } else { connectPrompt }
         }
         .background(LibraryTokens.bg)
         .task { await refreshState() }
@@ -85,19 +85,6 @@ public struct PikPakView: View {
             .buttonStyle(.borderedProminent).tint(LibraryTokens.accent).padding(.top, 6)
             Text("将打开 PikPak 官方登录页，登录后自动连接").font(.system(size: 11))
                 .foregroundStyle(LibraryTokens.text3)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(40)
-    }
-
-    private var signedInPlaceholder: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "checkmark.circle.fill").font(.system(size: 44))
-                .foregroundStyle(LibraryTokens.accent)
-            Text("已连接 PikPak").font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(LibraryTokens.text)
-            Text("网盘文件浏览与直接播放正在开发中。").font(.system(size: 13))
-                .foregroundStyle(LibraryTokens.text2)
-                .multilineTextAlignment(.center).frame(maxWidth: 380)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity).padding(40)
     }

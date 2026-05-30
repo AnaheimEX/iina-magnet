@@ -19,14 +19,18 @@ public struct PikPakWebCredentials: Sendable, Equatable {
     public let userID: String
     public let deviceID: String?
     public let expiresIn: Int?
+    /// A live captcha token captured from the web client's own API traffic, so
+    /// we never have to compute captcha_sign (which depends on rotating salts).
+    public let captchaToken: String?
 
     public init(accessToken: String, refreshToken: String, userID: String,
-                deviceID: String?, expiresIn: Int?) {
+                deviceID: String?, expiresIn: Int?, captchaToken: String? = nil) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.userID = userID
         self.deviceID = deviceID
         self.expiresIn = expiresIn
+        self.captchaToken = captchaToken
     }
 }
 

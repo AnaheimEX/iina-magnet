@@ -17,7 +17,6 @@ import OSLog
 
 public actor PikPakAuth {
     private static let logger = Logger(subsystem: "iina-magnet", category: "pikpak-auth")
-    private static let deviceIDKey = "iina-magnet.pikpak.deviceID"
 
     /// App-wide session, shared by the login UI and (later) the file API.
     public static let shared = PikPakAuth()
@@ -67,7 +66,9 @@ public actor PikPakAuth {
     /// PikPak's page handles captcha / 2FA, we keep the resulting session).
     public func adopt(_ web: PikPakWebCredentials) {
         let device = web.deviceID ?? stableDeviceID()
-        UserDefaults.standard.set(device, forKey: Self.deviceIDKey)
+        // Reuse the captcha token PikPak's own page already minted, so drive
+        // calls don't need a self-computed (salt-dependent) captcha_sign.
+        driveCaptchaToken = web.captchaToken ?? ""
         let newSession = PikPakSession(
             accessToken: web.accessToken,
             refreshToken: web.refreshToken,
@@ -103,6 +104,9 @@ public actor PikPakAuth {
     // MARK: - For the drive API
 
     public var userAgent: String { config.userAgent }
+
+    /// The current captcha token (captured at login), if any.
+    public var currentCaptchaToken: String { driveCaptchaToken }
 
     /// Forces an access-token refresh (used when PikPak rejects a token the
     /// client still considered valid).
@@ -213,14 +217,10 @@ public actor PikPakAuth {
         return ["username": username]
     }
 
-    /// Reuses the session's device id, else a persisted one, else mints+persists
-    /// a new one — PikPak ties tokens to a stable device id.
+    /// The session's device id, else a freshly minted one. Web login supplies
+    /// its own; the password fallback mints one per fresh login.
     private func stableDeviceID() -> String {
-        if let existing = session?.deviceID { return existing }
-        if let saved = UserDefaults.standard.string(forKey: Self.deviceIDKey) { return saved }
-        let fresh = PikPakCrypto.randomDeviceID()
-        UserDefaults.standard.set(fresh, forKey: Self.deviceIDKey)
-        return fresh
+        session?.deviceID ?? PikPakCrypto.randomDeviceID()
     }
 
     private func headers(deviceID: String, captcha: String?) -> [String: String] {

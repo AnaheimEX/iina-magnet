@@ -65,42 +65,121 @@ struct PikPakLoginWebView: NSViewRepresentable {
         private let onCapture: (PikPakWebCredentials) -> Void
         private var captured = false
 
+        // Latest pieces seen; assembled once tokens + captcha + device align.
+        private var lastLocalStorage: String?
+        private var capturedCaptcha: String?
+        private var capturedDevice: String?
+        private var fallbackScheduled = false
+
         init(onCapture: @escaping (PikPakWebCredentials) -> Void) {
             self.onCapture = onCapture
         }
 
-        // Periodic localStorage snapshot pushed from the injected script.
         func userContentController(_ controller: WKUserContentController,
                                    didReceive message: WKScriptMessage) {
-            guard let json = message.body as? String else { return }
-            tryCapture(from: json)
+            if let json = message.body as? String {              // legacy: bare localStorage
+                lastLocalStorage = json
+            } else if let dict = message.body as? [String: Any] {
+                switch dict["type"] as? String {
+                case "ls":  lastLocalStorage = dict["data"] as? String ?? lastLocalStorage
+                case "hdr":
+                    if let c = (dict["captcha"] as? String)?.nonEmpty { capturedCaptcha = c }
+                    if let d = (dict["device"] as? String)?.nonEmpty { capturedDevice = d }
+                default: break
+                }
+            }
+            attemptFinish()
         }
 
-        // Also probe right after each navigation settles.
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             webView.evaluateJavaScript("JSON.stringify(localStorage)") { [weak self] result, _ in
-                if let json = result as? String { self?.tryCapture(from: json) }
+                guard let self else { return }
+                if let json = result as? String { self.lastLocalStorage = json }
+                self.attemptFinish()
             }
         }
 
-        private func tryCapture(from json: String) {
-            guard !captured, let cred = PikPakWebCredentialParser.parse(localStorageJSON: json) else { return }
+        /// Finishes when we have tokens + a captured captcha token + a device id
+        /// (a fully working session). Falls back to tokens-only after a short
+        /// grace period if the SPA never makes an API call we can observe.
+        private func attemptFinish() {
+            guard !captured,
+                  let json = lastLocalStorage,
+                  let base = PikPakWebCredentialParser.parse(localStorageJSON: json) else { return }
+
+            let device = capturedDevice ?? base.deviceID
+            if let captcha = capturedCaptcha, let device {
+                finish(base, device: device, captcha: captcha)
+                return
+            }
+            scheduleFallback(json)
+        }
+
+        private func scheduleFallback(_ json: String) {
+            guard !fallbackScheduled else { return }
+            fallbackScheduled = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+                guard let self, !self.captured,
+                      let base = PikPakWebCredentialParser.parse(localStorageJSON: self.lastLocalStorage ?? json)
+                else { return }
+                self.finish(base, device: self.capturedDevice ?? base.deviceID, captcha: self.capturedCaptcha)
+            }
+        }
+
+        private func finish(_ base: PikPakWebCredentials, device: String?, captcha: String?) {
             captured = true
-            onCapture(cred)
+            onCapture(PikPakWebCredentials(accessToken: base.accessToken,
+                                           refreshToken: base.refreshToken,
+                                           userID: base.userID,
+                                           deviceID: device,
+                                           expiresIn: base.expiresIn,
+                                           captchaToken: captcha))
         }
     }
 
-    /// Pushes a localStorage snapshot to native shortly after load and on a
-    /// timer, so we notice the tokens as soon as login completes.
+    /// Injected at document start: pushes localStorage snapshots (for tokens)
+    /// and captures the captcha / device headers from the SPA's own API calls
+    /// (fetch + XHR), so we reuse PikPak's valid captcha token instead of
+    /// recomputing captcha_sign.
     static let captureJS = """
     (function () {
-      function send() {
+      function post(o) { try { window.webkit.messageHandlers.pikpak.postMessage(o); } catch (e) {} }
+      function snapshot() { try { post({ type: 'ls', data: JSON.stringify(window.localStorage) }); } catch (e) {} }
+      window.addEventListener('load', snapshot);
+      setInterval(snapshot, 1500);
+
+      function grab(headers) {
+        if (!headers) return;
         try {
-          window.webkit.messageHandlers.pikpak.postMessage(JSON.stringify(window.localStorage));
+          var get = function (k) { return headers.get ? headers.get(k) : headers[k]; };
+          var cap = get('x-captcha-token') || get('X-Captcha-Token');
+          var dev = get('x-device-id') || get('X-Device-ID');
+          if (cap || dev) post({ type: 'hdr', captcha: cap || '', device: dev || '' });
         } catch (e) {}
       }
-      window.addEventListener('load', send);
-      setInterval(send, 1500);
+
+      var origFetch = window.fetch;
+      window.fetch = function (input, init) {
+        try {
+          if (init && init.headers) grab(init.headers);
+          else if (input && input.headers) grab(input.headers);
+        } catch (e) {}
+        return origFetch.apply(this, arguments);
+      };
+
+      var origSet = XMLHttpRequest.prototype.setRequestHeader;
+      XMLHttpRequest.prototype.setRequestHeader = function (k, v) {
+        try {
+          var key = (k || '').toLowerCase();
+          if (key === 'x-captcha-token') post({ type: 'hdr', captcha: v, device: '' });
+          if (key === 'x-device-id') post({ type: 'hdr', captcha: '', device: v });
+        } catch (e) {}
+        return origSet.apply(this, arguments);
+      };
     })();
     """
+}
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
 }
