@@ -1,6 +1,6 @@
 # Issue 17 · 播放进度回写 + 三态驱动（IinaBridge hook）
 
-Status: ready-for-agent
+Status: completed (merged to develop)
 Sprint: 4 (总览 + 三态 + 统计)
 Created: 2026-05-29
 Updated: 2026-05-29
