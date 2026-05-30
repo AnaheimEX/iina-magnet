@@ -17,6 +17,10 @@ import OSLog
 
 public actor PikPakAuth {
     private static let logger = Logger(subsystem: "iina-magnet", category: "pikpak-auth")
+    private static let deviceIDKey = "iina-magnet.pikpak.deviceID"
+
+    /// App-wide session, shared by the login UI and (later) the file API.
+    public static let shared = PikPakAuth()
 
     private let config: PikPakConfig
     private let http: PikPakHTTPClient
@@ -54,6 +58,22 @@ public actor PikPakAuth {
         session = newSession
         store.save(newSession)
         Self.logger.info("signed in (sub=\(newSession.userID, privacy: .private(mask: .hash)))")
+    }
+
+    /// Adopts tokens captured from a web-view login (the primary login path —
+    /// PikPak's page handles captcha / 2FA, we keep the resulting session).
+    public func adopt(_ web: PikPakWebCredentials) {
+        let device = web.deviceID ?? stableDeviceID()
+        UserDefaults.standard.set(device, forKey: Self.deviceIDKey)
+        let newSession = PikPakSession(
+            accessToken: web.accessToken,
+            refreshToken: web.refreshToken,
+            userID: web.userID,
+            deviceID: device,
+            expiresAt: Date().addingTimeInterval(TimeInterval(web.expiresIn ?? 7200)))
+        session = newSession
+        store.save(newSession)
+        Self.logger.info("adopted web session (sub=\(newSession.userID, privacy: .private(mask: .hash)))")
     }
 
     /// A valid access token, refreshing transparently if it's near expiry.
@@ -145,10 +165,9 @@ public actor PikPakAuth {
     /// a new one — PikPak ties tokens to a stable device id.
     private func stableDeviceID() -> String {
         if let existing = session?.deviceID { return existing }
-        let key = "iina-magnet.pikpak.deviceID"
-        if let saved = UserDefaults.standard.string(forKey: key) { return saved }
+        if let saved = UserDefaults.standard.string(forKey: Self.deviceIDKey) { return saved }
         let fresh = PikPakCrypto.randomDeviceID()
-        UserDefaults.standard.set(fresh, forKey: key)
+        UserDefaults.standard.set(fresh, forKey: Self.deviceIDKey)
         return fresh
     }
 

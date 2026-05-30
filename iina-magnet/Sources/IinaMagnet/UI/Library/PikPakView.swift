@@ -3,14 +3,19 @@
 //  IinaMagnet
 //
 //  PikPak cloud-drive screen, reached from the library sidebar (下方「最近添加」).
-//  Phase 3 entry point: this is the home for PikPak login + file browsing. The
-//  auth + file-listing + play-direct-link wiring lands in the next unit; for now
-//  it presents the connect prompt so the access point exists.
+//  Login goes through the official mypikpak.com page in a web view; on success
+//  we adopt the captured session (PikPakAuth.shared). File browsing + direct
+//  play wiring lands in the next unit — for now the signed-in state shows a
+//  placeholder.
 
 import SwiftUI
 
 public struct PikPakView: View {
     private let onBack: () -> Void
+
+    @State private var signedIn = false
+    @State private var userID: String?
+    @State private var showLogin = false
 
     public init(onBack: @escaping () -> Void = {}) {
         self.onBack = onBack
@@ -20,9 +25,26 @@ public struct PikPakView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(LibraryTokens.sep)
-            connectPrompt
+            if signedIn { signedInPlaceholder } else { connectPrompt }
         }
         .background(LibraryTokens.bg)
+        .task { await refreshState() }
+        .sheet(isPresented: $showLogin) {
+            PikPakLoginSheet(
+                onCancel: { showLogin = false },
+                onCapture: { cred in
+                    showLogin = false
+                    Task {
+                        await PikPakAuth.shared.adopt(cred)
+                        await refreshState()
+                    }
+                })
+        }
+    }
+
+    private func refreshState() async {
+        signedIn = await PikPakAuth.shared.isSignedIn
+        userID = await PikPakAuth.shared.userID
     }
 
     private var header: some View {
@@ -37,6 +59,12 @@ public struct PikPakView: View {
                     .foregroundStyle(LibraryTokens.text)
             }
             Spacer()
+            if signedIn {
+                Button("退出登录") {
+                    Task { await PikPakAuth.shared.signOut(); await refreshState() }
+                }
+                .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(LibraryTokens.text2)
+            }
         }
         .padding(.horizontal, 14)
         .frame(height: LibraryTokens.Spacing.toolbarHeight)
@@ -51,11 +79,25 @@ public struct PikPakView: View {
             Text("登录后即可浏览网盘里的视频，并直接在 IINA 中播放。")
                 .font(.system(size: 13)).foregroundStyle(LibraryTokens.text2)
                 .multilineTextAlignment(.center).frame(maxWidth: 380)
-            Button { /* login flow — next unit */ } label: {
+            Button { showLogin = true } label: {
                 Text("登录 PikPak").padding(.horizontal, 18).padding(.vertical, 7)
             }
             .buttonStyle(.borderedProminent).tint(LibraryTokens.accent).padding(.top, 6)
-            Text("接入开发中").font(.system(size: 11)).foregroundStyle(LibraryTokens.text3)
+            Text("将打开 PikPak 官方登录页，登录后自动连接").font(.system(size: 11))
+                .foregroundStyle(LibraryTokens.text3)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(40)
+    }
+
+    private var signedInPlaceholder: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 44))
+                .foregroundStyle(LibraryTokens.accent)
+            Text("已连接 PikPak").font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(LibraryTokens.text)
+            Text("网盘文件浏览与直接播放正在开发中。").font(.system(size: 13))
+                .foregroundStyle(LibraryTokens.text2)
+                .multilineTextAlignment(.center).frame(maxWidth: 380)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity).padding(40)
     }
