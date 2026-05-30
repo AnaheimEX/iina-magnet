@@ -31,6 +31,7 @@ public struct MediaLibraryView: View {
     private let onCancelScan: () -> Void
     private let onOpenPending: (() -> Void)?
     private let onOpenPikPak: () -> Void
+    private let onOpenMikan: () -> Void
 
     @State private var section: LibrarySection = .all
     @State private var selectedTags: Set<String> = []
@@ -51,7 +52,8 @@ public struct MediaLibraryView: View {
                 onScan: @escaping () -> Void = {},
                 onCancelScan: @escaping () -> Void = {},
                 onOpenPending: (() -> Void)? = nil,
-                onOpenPikPak: @escaping () -> Void = {}) {
+                onOpenPikPak: @escaping () -> Void = {},
+                onOpenMikan: @escaping () -> Void = {}) {
         self.items = items
         self.displayState = displayState
         self.onOpen = onOpen
@@ -59,6 +61,7 @@ public struct MediaLibraryView: View {
         self.onCancelScan = onCancelScan
         self.onOpenPending = onOpenPending
         self.onOpenPikPak = onOpenPikPak
+        self.onOpenMikan = onOpenMikan
     }
 
     private var filtered: [LibraryItemViewModel] {
@@ -80,7 +83,8 @@ public struct MediaLibraryView: View {
                     LibrarySidebar(items: items, counts: counts,
                                    section: $section, selectedTags: $selectedTags,
                                    compact: sidebarCompact,
-                                   onOpenPikPak: onOpenPikPak)
+                                   onOpenPikPak: onOpenPikPak,
+                                   onOpenMikan: onOpenMikan)
                         .frame(width: sidebarCompact ? LibrarySidebar.compactWidth : sidebarWidth)
                     ResizableDivider(width: $sidebarWidth,
                                      range: Self.sidebarMinWidth...Self.sidebarMaxWidth,
