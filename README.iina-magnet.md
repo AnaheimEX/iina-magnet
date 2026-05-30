@@ -1,173 +1,159 @@
 # iina-magnet — User Guide
 
-> Private fork of [iina](https://github.com/iina/iina) (GPL-3.0) that adds RSS subscriptions, BitTorrent streaming, and a built-in media library (Phase 2).
+> Private fork of [iina](https://github.com/iina/iina) (GPL-3.0) that adds a
+> built-in **media library** for anime / movies, a **PikPak** cloud-drive
+> integration (browse + direct cloud play), and a **Mikan (蜜柑计划)** browser
+> that saves torrents straight into PikPak — closing the loop:
+> *discover on Mikan → store in PikPak → play from the cloud, or scan & organize
+> your local files.*
 >
-> This document covers everyday usage. For the development plan and architecture, see the [`planning`](https://github.com/AnaheimEX/iina-magnet/tree/planning) branch of this repository.
+> For the development plan and architecture, see the
+> [`planning`](https://github.com/AnaheimEX/iina-magnet/tree/planning) branch.
 
 ---
 
-## Install / Build
+## Build / Run
 
 ```bash
 git clone https://github.com/AnaheimEX/iina-magnet.git
 cd iina-magnet
 
-# 1. Vendored dependencies for iina itself (mpv, ffmpeg)
-./other/download_libs.sh
+# 1. Prebuilt universal dylibs for iina itself (mpv, ffmpeg, …). The
+#    PROJECT_NAME override lets the fork's directory name work.
+PROJECT_NAME=iina-magnet ./other/download_libs.sh --skip-plugins
 
-# 2. Vendored libtorrent universal static library (one-time, ~7 min)
-./lib/libtorrent/build.sh
+# 2. Build the app. The signing flags are REQUIRED — see the note below.
+xcodebuild -scheme iina -configuration Debug -derivedDataPath /tmp/iina-dd \
+  CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO build
 
-# 3. Build the app
-xcodebuild -project iina.xcodeproj \
-           -scheme iina \
-           -configuration Debug \
-           -derivedDataPath build
-open build/Build/Products/Debug/IINA.app
+open /tmp/iina-dd/Build/Products/Debug/IINA.app
 ```
+
+> ⚠️ **Use `CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO`**, not
+> `CODE_SIGNING_ALLOWED=NO`. After `other/change_lib_dependencies.rb` rewrites
+> the dylibs' install names, an unsigned bundle is SIGKILLed by the macOS 26
+> kernel (CODESIGNING / Invalid Page) on launch. The flags above make Xcode
+> ad-hoc sign everything.
 
 Requirements:
 
 | | |
 |---|---|
-| Xcode | 26.5 / Swift 6.x |
+| Xcode | 26.x / Swift 6.x |
 | macOS | 14.0 (Sonoma) or later |
-| Homebrew | for `cmake` + `openssl@3` used by libtorrent build |
+
+> The `IinaMagnet` Swift package builds and tests standalone:
+> `cd iina-magnet && swift test`. The `LibtorrentBridge` target is dormant
+> (kept for possible future use); building its tests needs
+> `./lib/libtorrent/build.sh` (one-time, ~7 min, needs Homebrew `cmake` +
+> `openssl@3`). The `AnitomyBridge` target *is* used (filename parsing).
 
 ---
 
 ## First launch
 
-You will be asked to accept the **Disclaimer** (zh-Hans / en double tab). The "I Agree" button is enabled only after you scroll to the bottom of the active language. You can review the disclaimer any time via `Magnet → Disclaimer…`.
+You'll be asked to accept the **Disclaimer** (zh-Hans / en). "I Agree" enables
+after you scroll to the bottom. Review it any time from the disclaimer entry.
+
+The media library opens from the **「媒体库」button on IINA's launch window**
+(below the build badge). The window auto-sizes to your display and scales its
+contents up so everything stays comfortably clickable.
 
 ---
 
-## Quick start
+## Features
 
-### 1. Add a subscription source
+### Media library (local files)
+- Add your anime / movie folders; IINA scans them and scrapes covers,
+  synopsis, ratings and episode data from **Bangumi**.
+- Browser with poster wall / list, a filter sidebar (watch state, media type,
+  tags: genre / country / rating / quality / release group / year), search and
+  sort, a resizable + collapsible sidebar.
+- Per-title archive page: confirm / re-match / manual edit / mark-unmatched,
+  play a version in iina, reveal in Finder, toggle watched.
+- Watch progress is recorded automatically and completes an episode at ≥90%.
 
-`Magnet → RSS Manager…` → `+` button → enter URL + display name.
+### PikPak cloud drive
+- Sidebar entry **「PikPak 网盘」**. Login launches PikPak's official web page
+  (it handles captcha / 2FA); the app captures the resulting tokens — your
+  credentials never pass through the app's own code.
+- Browse folders, sort (name / time / size), and **play videos directly from
+  the cloud** in iina. Remote playback is tuned (larger network cache + a
+  User-Agent); route the playback host through a proxy for overseas CDNs.
 
-**Public source example** (no login):
-
-```
-https://nyaa.si/?page=rss
-```
-
-**Login-required source** (e.g. mikanani.me "MyBangumi"):
-
-1. Sign in via Safari/Chrome
-2. Open Developer Tools → Network tab → load the RSS page
-3. Copy the **Cookie** header (`__cfduid=…; bangumi=…`)
-4. In RSS Manager → source's `Authentication` panel → paste into `Cookie header`
-
-### 2. Write a rule
-
-`RSS Manager` → select source → `Rules` tab → `Add rule`.
-
-| | |
-|---|---|
-| **Include** | comma-separated keywords; all must appear in the title |
-| **Exclude** | comma-separated; any match rejects the item |
-| **Regex** (optional) | one regex; if non-empty, **overrides** include/exclude |
-| **caseSensitive** | off by default |
-
-Common include/exclude tokens:
-
-- Simplified Chinese: `简`, `CHS`, `SC`, `简日`
-- Traditional Chinese: `繁`, `CHT`, `TC`
-- Resolution: `1080p`, `4K`, `2160p`
-- Release groups: `LoliHouse`, `喵萌奶茶屋`, `SweetSub`, `Nekomoe kissaten`
-- Reject: `RAW`, `MP4` (if you want only `.mkv`)
-
-Example: only download 1080p with simplified Chinese subs:
-
-```
-Include: 1080p, 简
-Exclude: RAW
-```
-
-### 3. Wait for the next poll
-
-`Settings → RSS → Poll interval` defaults to 30 min. To trigger immediately, open the source's detail and click `Poll now`.
-
-### 4. Watch
-
-`Magnet → BT Manager…` will show the task as soon as the rule fires. **Double-click** to start streaming — playback begins as soon as the head of the file is downloaded. Subtitles inside the torrent are auto-copied to the video's sidecar location and picked up by mpv.
+### Mikan (蜜柑计划)
+- Sidebar entry **「蜜柑计划」** opens mikanani.me.
+- Clicking a magnet / `.torrent` link offers **save to PikPak** (offline
+  download) or **save & cloud-play**. Saves land in PikPak's
+  `Pack From Shared` folder with their real titles.
 
 ---
 
-## Settings (`Magnet → Settings…`)
+## Architecture (1-minute tour)
 
-### General
-
-* **Cache directory** — where downloads land while in-flight
-* **Completed directory** — where files move when they finish (default: `~/Movies/iina-magnet`)
-* **Move to completed when finished** — toggle off to keep things in cache
-* **Disk warning threshold** — alerts if free space falls below this
-
-### BitTorrent
-
-* **Listen port** — default 6881
-* **DHT / PEX / LSD** — defaults on (peer discovery)
-* **UPnP / NAT-PMP** — **off** by default; only enable on networks you control
-* **Seeding strategy** — default is "Zero seed" (download finishes → upload stops). Change to ratio-based or "Seed forever" if you participate in a private tracker community
-
-### RSS
-
-* **Default poll interval** for newly added sources
-* **Auto-start downloads on match** — toggle off if you want to manually confirm
+- Almost everything lives in the isolated Swift package
+  [`iina-magnet/`](iina-magnet) (`IinaMagnet` library + tests). Upstream IINA
+  never touches it.
+- The iina side has only a few small, comment-marked hooks
+  (`// MARK: iina-magnet hook`): `iina/IinaMagnetBridge.swift` (new),
+  `iina/AppDelegate.swift`, `iina/InitialWindowController.swift`.
+- This keeps the fork easy to maintain — see **Following upstream** below.
 
 ---
 
-## Troubleshooting
+## Roadmap / TODO
 
-| Problem | Likely cause | Fix |
-|---|---|---|
-| RSS source shows orange dot ⚠ | Site rejected request (cookie expired, 403, etc.) | Update Cookie header in source settings |
-| Magnet stays "Resolving" forever | Tracker / DHT not reachable | Verify network; toggle DHT on; verify firewall on listen port |
-| Streaming stutters | Buffer ahead too thin for connection speed | Lower video bitrate estimate (Settings → not yet exposed; current default 2 MB/s ≈ 16 Mbps) |
-| Built-in subtitles not loading | Subtitle file in a non-standard layout | Open download folder; ensure `.srt`/`.ass` exists next to video |
-| Build fails with `openssl/opensslv.h not found` | Homebrew openssl@3 not installed | `brew install openssl@3` |
-| `lib/libtorrent/build.sh` fails downloading boost | archives.boost.io throttled | Re-run; script resumes from cached state |
+Shipped and verified: media library (scan / match / archive / watch progress /
+tags / filters), PikPak (web login, browse, sort, cloud play, offline
+download), Mikan → PikPak save & cloud-play, screen-adaptive window scaling,
+upstream-sync tooling.
+
+Not yet done — for future development:
+
+- [ ] **More metadata sources** — only Bangumi is wired. Add **TMDB** (movies /
+      non-anime, *Issue 06*) and **Douban** (*Issue 08*).
+- [ ] **Multi-source metadata merge** (*Issue 10*) — combine Bangumi + TMDB +
+      Douban into one record instead of a single source.
+- [ ] **PikPak offline-task center** — a view listing running / failed offline
+      tasks with progress, retry and delete (PikPak `drive/v1/tasks` APIs).
+      Currently saving is fire-and-forget (cloud-play polls the file instead).
+- [ ] **PikPak cloud files as a first-class library source** — scrape metadata
+      for cloud items so they appear in the unified library, not just the file
+      browser.
+- [ ] **PikPak captcha auto-refresh** — when the captured captcha token expires
+      and a self-signed re-mint is rejected (rotated salts), the app currently
+      asks the user to re-login. Could silently re-capture via a hidden web view.
+- [ ] **Mikan save names** — pull the episode title from the page DOM for nicer
+      task names / richer confirmation, beyond what PikPak resolves.
+- [ ] **Crisper scaling (optional)** — the window uses a uniform `scaleEffect`,
+      which slightly softens text at higher factors; true size scaling would be
+      sharper but touches many hard-coded sizes.
+- [ ] **Trim dormant target (optional)** — remove the unused `LibtorrentBridge`
+      target/lib if BT is never revived.
 
 ---
 
-## Known limitations
+## Following upstream IINA
 
-* No iOS / iPadOS support
-* No built-in tracker list (you provide URLs / magnets yourself)
-* Default seeding is "Zero" — change in settings for community-trackers
-* Media library (`Magnet → Library…`) is Phase 2 and currently disabled
-* Streaming heuristics use a fixed 2 MB/s bitrate estimate; high-bitrate 4K may need manual bump (Phase 2 will adapt)
+This is a fork. To merge a new upstream release while keeping all custom
+features:
+
+```bash
+./scripts/sync-upstream.sh v1.4.3        # use the target upstream tag
+```
+
+Full workflow, the fork-modification manifest, and conflict-resolution tips:
+[`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md).
 
 ---
 
 ## Legal
 
-This fork only adds technical capabilities (RSS subscription, BT transport, library). It does **not** ship trackers, indexes, or sample content. Users are solely responsible for the legality of what they download and upload in their own jurisdiction.
-
-Default safety posture:
-
-- **Zero seeding** (no automatic uploads after download completes)
-- **UPnP disabled** (no automatic router exposure)
-- **BT encryption forced** by default
-
-See the full disclaimer at `Magnet → Disclaimer…`.
-
----
-
-## Maintenance — following upstream IINA
-
-This is a fork. To merge a new upstream IINA release while keeping all custom
-features, run (with the target upstream tag):
-
-```bash
-./scripts/sync-upstream.sh v1.4.3
-```
-
-Full workflow, the fork-modification manifest, and conflict-resolution tips:
-[`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md).
+This fork only adds technical capabilities (a media library, and integrations
+with services you log into with **your own account**, the way tools like rclone
+do). It ships **no** trackers, indexes, or sample content. You are solely
+responsible for the legality of what you store, download, and play in your own
+jurisdiction.
 
 ---
 

@@ -4,19 +4,23 @@
 >
 > 部署目标 macOS 14。`#Index` / `#Unique` 宏需 macOS 15，本项目暂不可用——硬约束用 `@Attribute(.unique)`，其余筛选维度走内存过滤 / `#Predicate`。复合索引待最低系统升到 macOS 15 再加。
 
-## Phase 1 · BT / RSS（已合并）
+## Phase 1 · BT / RSS（已于 Phase 3 移除）
+
+> `TorrentTask` / `SubscriptionSource` / `SubscriptionRule` / `FeedItem` 已在
+> Phase 3（移除 BT/RSS）随相关管线一并从 schema 删除，仅 `DisclaimerAcceptance`
+> 保留。当前注册的 model 见下表（与 `PersistenceController.swift` 的
+> `Schema([...])` 一致）。
 
 | Model | 关键字段 | 约束 / 关系 |
 | --- | --- | --- |
 | `DisclaimerAcceptance` | version, acceptedAt | — |
-| `TorrentTask` | infoHash(unique), savePath, statusRaw, progress | — |
-| `SubscriptionSource` | url(unique), displayName, pollIntervalSeconds, cookieHeader, customHeaders, enabled | `rules` 1-N cascade → SubscriptionRule |
-| `SubscriptionRule` | name, include[], exclude[], regex?, caseSensitive, enabled, hitCount | inverse → source |
-| `FeedItem` | guid(unique), title, enclosureURL, publishedAt, matched | source / matchedRule 关系 |
+
+> **PikPak / 蜜柑计划不新增 SwiftData model**：登录会话存 Keychain
+> （`KeychainPikPakTokenStore`），网盘文件实时拉取、不落库。
 
 ## Phase 2 · 媒体库（Issue 01）
 
-> 枚举存 `*Raw: Int` + 计算属性（沿用 TorrentTaskStatus）。`MediaKind` / `MatchState` / `TagCategory` / `ProgressState` 见 `Library/Models/LibraryEnums.swift`。
+> 枚举存 `*Raw: Int` + 计算属性。`MediaKind` / `MatchState` / `TagCategory` / `ProgressState` 见 `Library/Models/LibraryEnums.swift`。
 
 | Model | 关键字段 | 约束 / 关系 |
 | --- | --- | --- |
@@ -35,4 +39,4 @@
 - **不存 `PersistentIdentifier`**：SwiftData 不接受裸 `PersistentIdentifier` 作存储属性（同 `FeedItem.source` 教训），故 `WatchProgress.title` 用 `@Relationship`。
 - **电影占位**：电影用 `Season(number: 0)` + `Episode(number: 0)` 挂 `VersionFile`，UI 按 `kind == .movie` 隐藏集数网格。
 - **`aggregateStateRaw`**：Title 上缓存的派生三态，由 WatchProgressTracker（Issue 17）更新、三态筛选（Issue 16）消费，避免每次遍历全部 Episode。
-- **唯一约束即 upsert**：`@Attribute(.unique)`（fileFingerprint / cacheKey / url / infoHash / guid）冲突时 SwiftData 以该键 upsert，不产生重复行——扫描器（Issue 04）据此幂等。
+- **唯一约束即 upsert**：`@Attribute(.unique)`（`fileFingerprint` / `cacheKey`）冲突时 SwiftData 以该键 upsert，不产生重复行——扫描器（Issue 04）据此幂等。
