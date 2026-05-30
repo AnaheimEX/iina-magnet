@@ -27,11 +27,15 @@ public struct LibraryWindowView: View {
     @State private var didScan = false                       // a scan has completed this session
     @State private var folderStore = LibraryFolderStore.shared
 
-    public init() {}
+    public init(scale: CGFloat = 1) { self.scale = scale }
 
     private struct ScanState: Equatable {
         var done = 0, total = 0, current = ""
     }
+
+    /// Uniform scale applied to the whole window content (computed from the
+    /// display when the window opens), so every element grows proportionally.
+    private let scale: CGFloat
 
     @State private var itemCache = LibraryItemCache()
     /// Memoized so an unrelated @State change (scan tick, route, sidebar toggle)
@@ -51,6 +55,18 @@ public struct LibraryWindowView: View {
     }
 
     public var body: some View {
+        GeometryReader { geo in
+            content
+                // Lay out on a (window / scale) canvas, then scale up to fill the
+                // window so every element grows uniformly.
+                .frame(width: geo.size.width / max(scale, 0.01),
+                       height: geo.size.height / max(scale, 0.01))
+                .scaleEffect(scale, anchor: .topLeading)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         Group {
             if let id = route, let title = titles.first(where: { $0.persistentModelID == id }) {
                 ArchiveScreen(title: title, onBack: { route = nil },
@@ -76,7 +92,6 @@ public struct LibraryWindowView: View {
                                  onOpenMikan: { showMikan = true })
             }
         }
-        .frame(minWidth: 900, minHeight: 560)
     }
 
     /// Quick-confirm a pending title from the queue.

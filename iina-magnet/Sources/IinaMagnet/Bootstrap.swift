@@ -48,10 +48,22 @@ public enum IinaMagnetBootstrap {
 
     /// Opens the media-library window. The entry point lives on iina's initial
     /// (launch) window — a button below the build badge — which calls this.
+    ///
+    /// The window adapts to the current display each time it opens: sized to a
+    /// fraction of the screen (large, but never fullscreen) and the whole UI is
+    /// laid out on a ~1100pt canvas then scaled up to fill it, so every element
+    /// grows proportionally and stays easy to click on high-resolution screens.
     public static func openLibrary() {
+        let screen = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1440, height: 900)
+        let width  = max(960, screen.width * 0.74)
+        let height = max(640, screen.height * 0.82)
+        // Always enlarge (floor 1.5×), growing with screen width so elements are
+        // comfortably clickable; the UI lays out on a (window / scale) canvas and
+        // is scaled up to fill the window.
+        let scale  = min(max(screen.width / 1000, 1.5), 2.4)
         WindowFactory.shared.open(.library, title: "媒体库",
-                                  contentSize: .init(width: 1100, height: 720)) {
-            LibraryWindowView()
+                                  contentSize: CGSize(width: width, height: height)) {
+            LibraryWindowView(scale: scale)
                 .modelContainer(PersistenceController.shared.container)
         }
     }
