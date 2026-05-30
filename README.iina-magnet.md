@@ -102,22 +102,33 @@ contents up so everything stays comfortably clickable.
 ## Roadmap / TODO
 
 Shipped and verified: media library (scan / match / archive / watch progress /
-tags / filters), PikPak (web login, browse, sort, cloud play, offline
-download, **offline-task center**), Mikan → PikPak save & cloud-play,
-screen-adaptive window scaling, upstream-sync tooling.
+tags / filters), PikPak (web login, browse + **in-folder filter & cached
+navigation**, sort, cloud play, offline download, **offline-task center**),
+Mikan → PikPak save & cloud-play, screen-adaptive window scaling, upstream-sync
+tooling.
 
-Not yet done — for future development:
+**Current focus — speed up the one-shot cloud loop** (the actual workflow:
+discover on Mikan → save → watch once → done; cloud content is *not* kept or
+re-watched, so it is deliberately *not* brought into the library):
 
-- [ ] **More metadata sources** — only Bangumi is wired. Add **TMDB** (movies /
-      non-anime, *Issue 06*) and **Douban** (*Issue 08*).
-- [ ] **Multi-source metadata merge** (*Issue 10*) — combine Bangumi + TMDB +
-      Douban into one record instead of a single source.
+- [x] **Faster "find a file"** — the PikPak browser caches folder listings
+      (instant back-navigation, easier on the rate limit) and has an instant
+      in-folder filter box + refresh button.
+- [ ] **Faster "click → playing"** — prefetch / cache the playback URL so the
+      pre-roll round-trip overlaps user intent.
+- [ ] **Faster first frame** — retune the remote-playback mpv profile for quick
+      start (the current large readahead favours smoothness over startup).
+
+Lower priority (local library is only used occasionally; cloud is watch-once):
+
+- [ ] **More metadata sources** — only Bangumi is wired. **TMDB** (*Issue 06*) /
+      **Douban** (*Issue 08*). Deprioritized: local library is occasional-use.
+- [ ] **Multi-source metadata merge** (*Issue 10*) — blocked on the above.
 - [x] **PikPak offline-task center** — the PikPak screen has a 「离线任务」toggle
       listing running / pending / failed offline tasks with live progress, retry
       (re-submits the source URL) and delete (PikPak `drive/v1/tasks` APIs).
-- [ ] **PikPak cloud files as a first-class library source** — scrape metadata
-      for cloud items so they appear in the unified library, not just the file
-      browser.
+- [ ] ~~**PikPak cloud files as a library source**~~ — dropped: cloud content is
+      watch-once, so there is nothing to curate or re-watch in a library.
 - [x] **PikPak captcha auto-refresh** — when the captured captcha token expires
       and a self-signed re-mint is rejected (rotated salts), the app now
       silently re-captures a fresh token from the web client in an offscreen
