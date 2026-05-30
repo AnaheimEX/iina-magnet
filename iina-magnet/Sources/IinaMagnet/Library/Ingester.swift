@@ -65,6 +65,9 @@ public struct Ingester {
         episode.versions.append(version)
         context.insert(version)
 
+        // Keep the tri-state fresh against existing progress: re-scanning a fully
+        // watched show that gained a new episode should drop it back to 在看.
+        title.aggregateState = TitleDerivations.aggregateState(of: title)
         title.updatedAt = .now
         try context.save()
         return title

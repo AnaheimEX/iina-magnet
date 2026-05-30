@@ -150,7 +150,10 @@ private struct ArchiveScreen: View {
                     onReveal: { LibraryPlayback.revealInFinder($0) },
                     onConfirm: { try? editor.confirm(title) },
                     onMarkUnmatched: { try? editor.markUnmatched(title) },
-                    onMatchSheet: { showMatchSheet = true })
+                    onMatchSheet: { showMatchSheet = true },
+                    onToggleWatched: { watched in
+                        try? WatchProgressWriter(context: context).setWatched(watched, for: title)
+                    })
             .sheet(isPresented: $showMatchSheet) {
                 ManualMatchSheet(
                     initialQuery: title.titleZh ?? title.titleJa ?? "",
