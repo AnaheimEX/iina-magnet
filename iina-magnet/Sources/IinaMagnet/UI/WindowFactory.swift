@@ -30,7 +30,13 @@ public final class WindowFactory {
                                     title: String,
                                     contentSize: CGSize = .init(width: 900, height: 600),
                                     @ViewBuilder builder: () -> Content) {
-        if let existing = windows[key.rawValue], existing.isVisible {
+        // Reopen: re-adapt to the current screen — fresh content (so a new
+        // scale takes effect), resized + recentered — then raise.
+        if let existing = windows[key.rawValue] {
+            existing.title = title
+            existing.contentViewController = NSHostingController(rootView: builder())
+            existing.setContentSize(contentSize)
+            existing.center()
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -43,9 +49,10 @@ public final class WindowFactory {
             defer: false
         )
         window.title = title
+        window.contentViewController = NSHostingController(rootView: builder())
+        window.setContentSize(contentSize)
         window.center()
         window.isReleasedWhenClosed = false
-        window.contentViewController = NSHostingController(rootView: builder())
         windows[key.rawValue] = window
 
         window.makeKeyAndOrderFront(nil)

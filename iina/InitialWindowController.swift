@@ -161,13 +161,22 @@ class InitialWindowController: NSWindowController {
   /// window, opening the media-library window via IinaMagnet.
   private func setUpMediaLibraryButton() {
     guard let host = betaIndicatorView.superview else { return }
+    // .regularSquare honours an explicit size (unlike .rounded, whose bezel
+    // height is fixed), so the button can actually be made large.
     let button = NSButton(title: "媒体库", target: self, action: #selector(openMediaLibrary))
-    button.bezelStyle = .rounded
+    button.bezelStyle = .regularSquare
+    button.isBordered = true
+    button.font = .systemFont(ofSize: 18, weight: .semibold)
+    button.contentTintColor = .controlAccentColor
+    button.wantsLayer = true
+    button.layer?.cornerRadius = 8
     button.translatesAutoresizingMaskIntoConstraints = false
     host.addSubview(button)
+    // Compact button that hugs its (unchanged 18pt) title; height kept modest.
     NSLayoutConstraint.activate([
-      button.topAnchor.constraint(equalTo: betaIndicatorView.bottomAnchor, constant: 12),
-      button.centerXAnchor.constraint(equalTo: betaIndicatorView.centerXAnchor)
+      button.topAnchor.constraint(equalTo: betaIndicatorView.bottomAnchor, constant: 18),
+      button.centerXAnchor.constraint(equalTo: betaIndicatorView.centerXAnchor),
+      button.heightAnchor.constraint(equalToConstant: 36)
     ])
   }
 
