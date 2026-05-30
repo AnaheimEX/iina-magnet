@@ -241,6 +241,43 @@ struct MetadataTests {
         #expect(try ctx.fetch(FetchDescriptor<VersionFile>()).count == 3)
     }
 
+    /// Echoes the searched title back as the result, so each file must resolve
+    /// to its OWN metadata — surfaces any mis-pairing from concurrent resolve.
+    private struct EchoProvider: MetadataProvider {
+        let id: ProviderID = .bangumi
+        func search(_ q: SearchQuery) async throws -> [MetadataCandidate] {
+            [MetadataCandidate(providerId: .bangumi, externalId: q.title, title: q.title)]
+        }
+        func details(externalId: String) async throws -> MetadataDetails {
+            MetadataDetails(providerId: .bangumi, externalId: externalId, titleZh: externalId)
+        }
+    }
+
+    @Test("Bounded concurrent resolve pairs each file with its own metadata")
+    func concurrentPairing() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("conc-" + UUID().uuidString,
+                                                                 isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        let titles = ["葬送的芙莉莲", "孤独摇滚", "间谍过家家", "进击的巨人"]
+        for t in titles {
+            try Data("x".utf8).write(to: root.appendingPathComponent("[喵萌][\(t)][01][1080p].mkv"))
+        }
+        defer { try? fm.removeItem(at: root) }
+
+        let ctx = ModelContext(PersistenceController.inMemory().container)
+        // cap = 2 with 4 files exercises the "submit next as each completes" window.
+        let coordinator = IngestCoordinator(service: MetadataService(provider: EchoProvider()),
+                                            context: ModelContextBox(ctx),
+                                            maxConcurrentResolves: 2)
+        let count = try await coordinator.run(roots: [root])
+        #expect(count == 4)
+
+        let stored = try ctx.fetch(FetchDescriptor<Title>())
+        #expect(stored.count == 4)
+        #expect(Set(stored.compactMap(\.titleZh)) == Set(titles))   // each paired correctly
+    }
+
     @Test("Ingest is idempotent on fingerprint (re-scan doesn't duplicate)")
     func idempotent() async throws {
         let fm = FileManager.default

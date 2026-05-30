@@ -21,12 +21,17 @@ public struct IngestCoordinator {
 
     private let service: MetadataService
     private let context: ModelContextBox
+    private let maxConcurrentResolves: Int
 
     /// `ModelContext` isn't Sendable; box it so the struct stays simple while we
     /// keep all context use inside the synchronous ingest pass.
-    public init(service: MetadataService, context: ModelContextBox) {
+    /// - Parameter maxConcurrentResolves: in-flight metadata lookups cap (politeness
+    ///   toward the provider + bounded memory); 5 is a good default for Bangumi.
+    public init(service: MetadataService, context: ModelContextBox,
+                maxConcurrentResolves: Int = 5) {
         self.service = service
         self.context = context
+        self.maxConcurrentResolves = max(1, maxConcurrentResolves)
     }
 
     /// Runs the full pipeline over `roots`. Returns the number of files ingested.
@@ -41,17 +46,29 @@ public struct IngestCoordinator {
             if let f = p.file { files.append(f) }
         }
 
-        // 2. Resolve metadata for each (async network) — no context touched here.
-        var resolved: [(ScannedFile, MetadataResolution)] = []
-        resolved.reserveCapacity(files.count)
-        for f in files {
-            resolved.append((f, await service.resolve(f.parsed)))
+        // 2. Resolve metadata (async network) — no context touched here. Run up to
+        //    `maxConcurrentResolves` lookups in flight; results are gathered by
+        //    index so file↔resolution pairing stays correct regardless of order.
+        let service = self.service
+        var resolved = [MetadataResolution?](repeating: nil, count: files.count)
+        await withTaskGroup(of: (Int, MetadataResolution).self) { group in
+            var next = 0
+            func submit(_ i: Int) {
+                let parsed = files[i].parsed
+                group.addTask { (i, await service.resolve(parsed)) }
+            }
+            while next < min(maxConcurrentResolves, files.count) { submit(next); next += 1 }
+            while let (i, res) = await group.next() {
+                resolved[i] = res
+                if next < files.count { submit(next); next += 1 }
+            }
         }
 
         // 3. Ingest (synchronous, no suspension) — the only place the context is used.
         let ingester = Ingester(context: context.context)
         var count = 0
-        for (file, resolution) in resolved {
+        for (i, file) in files.enumerated() {
+            guard let resolution = resolved[i] else { continue }
             do {
                 _ = try ingester.ingest(file, resolution: resolution)
                 count += 1
