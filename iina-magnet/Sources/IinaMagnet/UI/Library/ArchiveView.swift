@@ -13,7 +13,8 @@ public struct ArchiveView: View {
     private let vm: ArchiveViewModel
     private let fileInfo: FileInfo?
     private let onBack: () -> Void
-    private let onPlay: () -> Void
+    private let onPlay: (ArchiveVersion) -> Void
+    private let onReveal: (ArchiveVersion) -> Void
     private let onConfirm: () -> Void
     private let onMarkUnmatched: () -> Void
     private let onMatchSheet: () -> Void
@@ -21,7 +22,8 @@ public struct ArchiveView: View {
     public init(vm: ArchiveViewModel,
                 fileInfo: FileInfo? = nil,
                 onBack: @escaping () -> Void = {},
-                onPlay: @escaping () -> Void = {},
+                onPlay: @escaping (ArchiveVersion) -> Void = { _ in },
+                onReveal: @escaping (ArchiveVersion) -> Void = { _ in },
                 onConfirm: @escaping () -> Void = {},
                 onMarkUnmatched: @escaping () -> Void = {},
                 onMatchSheet: @escaping () -> Void = {}) {
@@ -29,6 +31,7 @@ public struct ArchiveView: View {
         self.fileInfo = fileInfo
         self.onBack = onBack
         self.onPlay = onPlay
+        self.onReveal = onReveal
         self.onConfirm = onConfirm
         self.onMarkUnmatched = onMarkUnmatched
         self.onMatchSheet = onMatchSheet
@@ -47,6 +50,11 @@ public struct ArchiveView: View {
     }
     private var versions: [ArchiveVersion] {
         vm.kind == .movie ? vm.movieVersions : (currentEpisode?.versions ?? [])
+    }
+    /// The version the play button acts on: the explicit selection, else the
+    /// first present (highest-resolution, since versions are pre-sorted) copy.
+    private var selectedVersionObject: ArchiveVersion? {
+        versions.first { $0.id == selectedVersion } ?? versions.first { !$0.isMissing }
     }
 
     public var body: some View {
@@ -157,7 +165,7 @@ public struct ArchiveView: View {
 
     private var heroActions: some View {
         HStack(spacing: 10) {
-            Button(action: vm.isUnmatched ? onMatchSheet : onPlay) {
+            Button(action: playPrimary) {
                 HStack(spacing: 5) {
                     Image(systemName: vm.isUnmatched ? "magnifyingglass" : "play.fill")
                     Text(vm.isUnmatched ? "搜索匹配" : (vm.resume?.label ?? "播放"))
@@ -165,7 +173,9 @@ public struct ArchiveView: View {
                 .font(.system(size: 14, weight: .medium))
                 .padding(.horizontal, 16).padding(.vertical, 8)
                 .background(.white, in: Capsule()).foregroundStyle(.black)
-            }.buttonStyle(.plain)
+            }
+            .buttonStyle(.plain)
+            .disabled(!vm.isUnmatched && selectedVersionObject == nil)
 
             Button {} label: {
                 HStack(spacing: 4) { Image(systemName: "checkmark"); Text("标记已看") }
@@ -356,9 +366,10 @@ public struct ArchiveView: View {
                 }
                 VStack(spacing: 6) {
                     ForEach(versions) { v in
-                        VersionRowView(version: v, selected: v.id == selectedVersion) {
-                            if !v.isMissing { selectedVersion = v.id }
-                        }
+                        VersionRowView(version: v, selected: v.id == selectedVersion,
+                                       onSelect: { if !v.isMissing { selectedVersion = v.id } },
+                                       onPlay: { onPlay(v) },
+                                       onReveal: { onReveal(v) })
                     }
                 }
             }
@@ -382,7 +393,12 @@ public struct ArchiveView: View {
     }
 
     private func selectDefaults() {
-        selectDefaultEpisode()
+        if vm.kind == .movie {
+            // No episode grid; default to the best present movie version.
+            selectedVersion = vm.movieVersions.first { !$0.isMissing }?.id
+        } else {
+            selectDefaultEpisode()
+        }
     }
 
     /// Default to the resume episode → else first multi-version episode → else first.
@@ -393,6 +409,13 @@ public struct ArchiveView: View {
             ?? eps[0]
         selectedEpisode = ep.number
         selectedVersion = ep.versions.first { !$0.isMissing }?.id
+    }
+
+    /// Hero primary button: search-match for unmatched works, else play the
+    /// selected version.
+    private func playPrimary() {
+        if vm.isUnmatched { onMatchSheet() }
+        else if let version = selectedVersionObject { onPlay(version) }
     }
 }
 
@@ -465,41 +488,54 @@ struct VersionRowView: View {
     let version: ArchiveVersion
     let selected: Bool
     var onSelect: () -> Void
+    var onPlay: () -> Void = {}
+    var onReveal: () -> Void = {}
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 12) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? LibraryTokens.accent : LibraryTokens.text3)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 8) {
-                        if let q = version.quality {
-                            Text(q).font(.system(size: 11, weight: .semibold))
-                                .padding(.horizontal, 6).padding(.vertical, 1)
-                                .background(LibraryTokens.accentSoft, in: Capsule())
-                                .foregroundStyle(LibraryTokens.accent)
-                        }
-                        if let g = version.releaseGroup {
-                            Text(g).font(.system(size: 12)).foregroundStyle(LibraryTokens.text)
-                        }
-                        if version.isMissing {
-                            Label("文件丢失", systemImage: "icloud.slash")
-                                .font(.system(size: 11)).foregroundStyle(LibraryTokens.fail)
-                        }
+        HStack(spacing: 12) {
+            Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                .foregroundStyle(selected ? LibraryTokens.accent : LibraryTokens.text3)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    if let q = version.quality {
+                        Text(q).font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(LibraryTokens.accentSoft, in: Capsule())
+                            .foregroundStyle(LibraryTokens.accent)
                     }
-                    if !version.languages.isEmpty {
-                        Label(version.languages.joined(separator: " / "), systemImage: "captions.bubble")
-                            .font(.system(size: 11)).foregroundStyle(LibraryTokens.text3)
+                    if let g = version.releaseGroup {
+                        Text(g).font(.system(size: 12)).foregroundStyle(LibraryTokens.text)
+                    }
+                    if version.isMissing {
+                        Label("文件已移动/删除", systemImage: "exclamationmark.triangle")
+                            .font(.system(size: 11)).foregroundStyle(LibraryTokens.fail)
                     }
                 }
-                Spacer()
-                Text(version.sizeText).font(.system(size: 12)).monospacedDigit()
-                    .foregroundStyle(LibraryTokens.text2)
+                if !version.languages.isEmpty {
+                    Label(version.languages.joined(separator: " / "), systemImage: "captions.bubble")
+                        .font(.system(size: 11)).foregroundStyle(LibraryTokens.text3)
+                }
             }
-            .padding(12)
-            .background(LibraryTokens.bg2, in: RoundedRectangle(cornerRadius: 8))
-            .opacity(version.isMissing ? 0.5 : 1)
+            Spacer()
+            Text(version.sizeText).font(.system(size: 12)).monospacedDigit()
+                .foregroundStyle(LibraryTokens.text2)
+
+            // Reveal in Finder + play this version.
+            Button(action: onReveal) { Image(systemName: "folder") }
+                .buttonStyle(.plain).foregroundStyle(LibraryTokens.text3)
+                .help("在 Finder 中显示")
+            if !version.isMissing {
+                Button(action: onPlay) { Image(systemName: "play.circle.fill") }
+                    .buttonStyle(.plain).foregroundStyle(LibraryTokens.accent)
+                    .help("播放此版本")
+            }
         }
-        .buttonStyle(.plain).disabled(version.isMissing)
+        .padding(12)
+        .background(LibraryTokens.bg2, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8)
+            .strokeBorder(selected ? LibraryTokens.accent : .clear, lineWidth: 1.5))
+        .opacity(version.isMissing ? 0.55 : 1)
+        .contentShape(Rectangle())
+        .onTapGesture { if !version.isMissing { onSelect() } }
     }
 }

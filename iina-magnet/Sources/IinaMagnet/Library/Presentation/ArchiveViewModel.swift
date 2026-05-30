@@ -24,6 +24,8 @@ public struct ArchiveVersion: Equatable, Sendable, Identifiable {
     public let languages: [String]
     public let sizeText: String
     public let isMissing: Bool
+    public let fileURL: URL          // for playback / reveal-in-Finder
+    public let bookmark: Data?       // security-scoped bookmark, if any
 }
 
 public struct ArchiveEpisode: Equatable, Sendable, Identifiable {
@@ -106,7 +108,7 @@ public struct ArchiveViewModel: Identifiable, Sendable {
         // directly and don't render a season/episode grid.
         if title.kind == .movie {
             let films = orderedSeasons.flatMap(\.episodes).flatMap(\.versions)
-            self.movieVersions = films.map(Self.version)
+            self.movieVersions = Self.versions(films)
             self.seasons = []
         } else {
             self.movieVersions = []
@@ -125,7 +127,7 @@ public struct ArchiveViewModel: Identifiable, Sendable {
                             LibraryFormatting.progress(positionSec: $0.lastPositionSec,
                                                        durationSec: $0.durationSec)
                         } ?? 0,
-                        versions: ep.versions.map(Self.version))
+                        versions: Self.versions(ep.versions))
                 }
                 return ArchiveSeason(id: season.number,
                                      name: Self.seasonName(number: season.number, kind: title.kind),
@@ -155,13 +157,30 @@ public struct ArchiveViewModel: Identifiable, Sendable {
 
     // MARK: - Builders
 
+    /// Maps + orders versions: highest resolution first, then largest file, so
+    /// the UI's default selection lands on the best available copy (impl hint).
+    /// Missing files sort last so a present copy is preferred as the default.
+    private static func versions(_ files: [VersionFile]) -> [ArchiveVersion] {
+        files
+            .sorted { a, b in
+                if a.isMissing != b.isMissing { return !a.isMissing }
+                let qa = a.resolution.map(TitleDerivations.qualityRank) ?? 0
+                let qb = b.resolution.map(TitleDerivations.qualityRank) ?? 0
+                if qa != qb { return qa > qb }
+                return a.fileSizeBytes > b.fileSizeBytes
+            }
+            .map(version)
+    }
+
     private static func version(_ v: VersionFile) -> ArchiveVersion {
         ArchiveVersion(id: v.fileFingerprint,
                        quality: v.resolution,
                        releaseGroup: v.releaseGroup,
                        languages: v.languages,
                        sizeText: LibraryFormatting.size(v.fileSizeBytes),
-                       isMissing: v.isMissing)
+                       isMissing: v.isMissing,
+                       fileURL: v.fileURL,
+                       bookmark: v.bookmark)
     }
 
     private static func seasonName(number: Int, kind: MediaKind) -> String {
