@@ -20,6 +20,7 @@ public struct LibraryWindowView: View {
     @Query(sort: \Title.createdAt, order: .reverse) private var titles: [Title]
 
     @State private var route: PersistentIdentifier?          // nil → browser, else archive
+    @State private var showPending = false                   // 待确认队列
     @State private var scan: ScanState?
     @State private var didScan = false                       // a scan has completed this session
     @State private var folderStore = LibraryFolderStore.shared
@@ -47,16 +48,30 @@ public struct LibraryWindowView: View {
     public var body: some View {
         Group {
             if let id = route, let title = titles.first(where: { $0.persistentModelID == id }) {
-                ArchiveScreen(title: title, onBack: { route = nil })
+                ArchiveScreen(title: title, onBack: { route = nil },
+                              onMergedAway: { route = $0 })
+            } else if showPending {
+                PendingConfirmationView(
+                    items: items.filter { $0.matchState != .confirmed },
+                    onBack: { showPending = false },
+                    onOpen: { showPending = false; route = $0 },
+                    onConfirm: confirm)
             } else {
                 MediaLibraryView(items: items,
                                  displayState: displayState,
                                  onOpen: { route = $0 },
                                  onScan: startScan,
-                                 onCancelScan: { scan = nil })
+                                 onCancelScan: { scan = nil },
+                                 onOpenPending: { showPending = true })
             }
         }
         .frame(minWidth: 900, minHeight: 560)
+    }
+
+    /// Quick-confirm a pending title from the queue.
+    private func confirm(_ id: PersistentIdentifier) {
+        guard let title = titles.first(where: { $0.persistentModelID == id }) else { return }
+        try? LibraryEditor(context: context).confirm(title)
     }
 
     // MARK: - Scanning
@@ -111,6 +126,9 @@ public struct LibraryWindowView: View {
 private struct ArchiveScreen: View {
     let title: Title
     var onBack: () -> Void
+    /// Called when a rebind merged this work into a different (existing) Title,
+    /// so this archive page now points at a deleted model and must navigate away.
+    var onMergedAway: (PersistentIdentifier) -> Void = { _ in }
 
     @Environment(\.modelContext) private var context
     @State private var showMatchSheet = false
@@ -153,13 +171,20 @@ private struct ArchiveScreen: View {
             }
     }
 
-    /// Fetches the picked candidate's full details (async), then applies on the
+    /// Fetches the picked candidate's full details (async), then re-binds on the
     /// main context — keeping the non-Sendable context off the await path.
+    /// `rebind` merges into an existing Title (migrating files) when one already
+    /// represents the chosen record, so confirming never leaves a duplicate.
     private func rebind(to candidate: MetadataCandidate) {
         Task { @MainActor in
             guard let details = try? await makeProvider().details(externalId: candidate.externalId)
             else { return }
-            try? editor.applyRematch(details, to: title)
+            guard let survivor = try? editor.rebind(title, to: details) else { return }
+            // A merge deleted `title`; this screen now references a dead model —
+            // jump to the surviving Title's page.
+            if survivor.persistentModelID != title.persistentModelID {
+                onMergedAway(survivor.persistentModelID)
+            }
         }
     }
 }

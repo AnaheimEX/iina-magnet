@@ -46,8 +46,8 @@ public struct Ingester {
         let isMovie = title.kind == .movie
         let seasonNo = isMovie ? 0 : (parsed.season ?? 1)
         let episodeNo = isMovie ? 0 : (parsed.episode ?? 1)
-        let season = season(number: seasonNo, in: title)
-        let episode = self.episode(number: episodeNo, seasonNumber: seasonNo, in: season)
+        let season = LibraryTree.season(number: seasonNo, in: title)
+        let episode = LibraryTree.episode(number: episodeNo, seasonNumber: seasonNo, in: season)
         if let meta = details?.episodes.first(where: { $0.number == episodeNo }) {
             episode.title = meta.title ?? episode.title
             episode.titleOriginal = meta.titleOriginal ?? episode.titleOriginal
@@ -119,24 +119,6 @@ public struct Ingester {
                                         genres: details?.genres ?? [],
                                         countries: details?.countries ?? [])
         try TagApplier.apply(derived, to: title, context: context)
-    }
-
-    // MARK: - Season / Episode
-
-    private func season(number: Int, in title: Title) -> Season {
-        if let s = title.seasons.first(where: { $0.number == number }) { return s }
-        let s = Season(number: number)
-        s.title = title
-        title.seasons.append(s)
-        return s
-    }
-
-    private func episode(number: Int, seasonNumber: Int, in season: Season) -> Episode {
-        if let e = season.episodes.first(where: { $0.number == number }) { return e }
-        let e = Episode(number: number, seasonNumber: seasonNumber)
-        e.season = season
-        season.episodes.append(e)
-        return e
     }
 
     // MARK: - Lookups

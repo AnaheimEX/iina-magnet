@@ -128,4 +128,73 @@ struct LibraryEditorTests {
         #expect(t.doubanRating == 9.4)            // new rating stored under its source
         #expect(t.bangumiRating == nil)
     }
+
+    @Test("rebind migrates the placeholder's files onto the existing Title, deletes placeholder")
+    func rebindMigratesFiles() throws {
+        let ctx = makeContext()
+
+        // An existing, confirmed Title for bangumi 459283 with one episode.
+        let target = Title(kind: .tv, titleZh: "葬送的芙莉莲", matchState: .confirmed)
+        target.bangumiId = 459283
+        let ts = Season(number: 1); ts.title = target; target.seasons.append(ts)
+        let te = Episode(number: 1, seasonNumber: 1); te.season = ts; ts.episodes.append(te)
+        ctx.insert(target); ctx.insert(ts); ctx.insert(te)
+
+        // A placeholder created from an unmatched scan, holding the actual file.
+        let placeholder = Title(kind: .unknown, titleZh: "[ANi] Sousou", matchState: .unmatched)
+        let ps = Season(number: 1); ps.title = placeholder; placeholder.seasons.append(ps)
+        let pe = Episode(number: 1, seasonNumber: 1); pe.season = ps; ps.episodes.append(pe)
+        let file = VersionFile(fileURL: URL(fileURLWithPath: "/m/Sousou.E01.mkv"),
+                               fileFingerprint: "fp1", fileSizeBytes: 1_000, resolution: "1080p")
+        file.episode = pe; pe.versions.append(file)
+        // Progress recorded against the placeholder before confirmation.
+        let wp = WatchProgress(title: placeholder, seasonNumber: 1, episodeNumber: 1,
+                               lastPositionSec: 300, durationSec: 1440, state: .inProgress)
+        placeholder.watchProgresses.append(wp)
+        ctx.insert(placeholder); ctx.insert(ps); ctx.insert(pe); ctx.insert(file); ctx.insert(wp)
+
+        let details = MetadataDetails(providerId: .bangumi, externalId: "459283",
+                                      titleZh: "葬送的芙莉莲", releaseYear: 2023)
+        let survivor = try LibraryEditor(context: ctx).rebind(placeholder, to: details)
+        try ctx.save()
+
+        #expect(survivor.persistentModelID == target.persistentModelID)   // merged into existing
+        // The file survived and now hangs off the target's episode.
+        let files = try ctx.fetch(FetchDescriptor<VersionFile>())
+        #expect(files.count == 1)
+        #expect(files.first?.episode?.season?.title?.bangumiId == 459283)
+        // Placeholder is gone — only one Title remains.
+        #expect(try ctx.fetch(FetchDescriptor<Title>()).count == 1)
+        // Watch progress was re-keyed to the survivor, not cascade-deleted.
+        let progress = try ctx.fetch(FetchDescriptor<WatchProgress>())
+        #expect(progress.count == 1)
+        #expect(progress.first?.title?.bangumiId == 459283)
+    }
+
+    @Test("rebind with no existing match applies in place (no merge)")
+    func rebindInPlace() throws {
+        let ctx = makeContext()
+        let t = Title(kind: .unknown, titleZh: "未知", matchState: .unmatched)
+        ctx.insert(t)
+        let details = MetadataDetails(providerId: .bangumi, externalId: "999", titleZh: "孤独摇滚")
+        let survivor = try LibraryEditor(context: ctx).rebind(t, to: details)
+        #expect(survivor.persistentModelID == t.persistentModelID)
+        #expect(t.titleZh == "孤独摇滚")
+        #expect(t.matchState == .confirmed)
+        #expect(try ctx.fetch(FetchDescriptor<Title>()).count == 1)
+    }
+
+    @Test("pendingTitles returns only non-confirmed titles")
+    func pendingQueue() throws {
+        let ctx = makeContext()
+        let confirmed = Title(kind: .tv, titleZh: "已确认", matchState: .confirmed)
+        let pending = Title(kind: .tv, titleZh: "待确认", matchState: .pendingConfirmation)
+        let unmatched = Title(kind: .unknown, titleZh: "未匹配", matchState: .unmatched)
+        [confirmed, pending, unmatched].forEach(ctx.insert)
+        try ctx.save()
+
+        let queue = try LibraryEditor(context: ctx).pendingTitles()
+        #expect(queue.count == 2)
+        #expect(!queue.contains { $0.matchState == .confirmed })
+    }
 }
