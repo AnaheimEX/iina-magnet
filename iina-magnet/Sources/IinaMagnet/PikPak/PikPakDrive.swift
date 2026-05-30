@@ -90,6 +90,12 @@ public actor PikPakDrive {
     public var offlineFolderName = "Pack From Shared"
     private var cachedOfflineFolderID: String?
 
+    /// Short-lived cache of resolved playback URLs, keyed by file id. Warmed by
+    /// `prefetchPlaybackURL` (on row hover) so the click→play path can skip the
+    /// detail round-trip. PikPak's signed links stay valid well beyond this TTL.
+    private var playbackURLCache: [String: (url: URL, fetchedAt: Date)] = [:]
+    private let playbackURLTTL: TimeInterval = 5 * 60
+
     public init(auth: PikPakAuth = .shared,
                 http: PikPakHTTPClient = URLSessionPikPakClient(),
                 config: PikPakConfig = .web) {
@@ -120,15 +126,31 @@ public actor PikPakDrive {
         return files
     }
 
-    /// A fresh, directly playable URL for a video file. Re-fetches the file's
-    /// detail so the returned link isn't a stale (expired) one.
-    public func playbackURL(fileID: String) async throws -> URL {
+    /// A directly playable URL for a video file. Served from the short-lived
+    /// cache when warm (so click→play is instant); otherwise fetches the file
+    /// detail and caches the resolved link. Pass `allowCached: false` to force a
+    /// fresh fetch.
+    public func playbackURL(fileID: String, allowCached: Bool = true) async throws -> URL {
+        if allowCached, let hit = playbackURLCache[fileID],
+           Date().timeIntervalSince(hit.fetchedAt) < playbackURLTTL {
+            return hit.url
+        }
         let data = try await authorizedGet(path: "/drive/v1/files/\(fileID)", query: [:])
         let file = try decode(PPFile.self, from: data)
         guard let url = file.bestPlaybackURL else {
             throw PikPakError.api(code: -1, message: "该文件没有可播放的链接")
         }
+        playbackURLCache[fileID] = (url, Date())
         return url
+    }
+
+    /// Best-effort warm of the playback-URL cache for a file (e.g. on row
+    /// hover), so a subsequent play skips the detail round-trip. No-op if
+    /// already warm; ignores errors.
+    public func prefetchPlaybackURL(fileID: String) async {
+        if let hit = playbackURLCache[fileID],
+           Date().timeIntervalSince(hit.fetchedAt) < playbackURLTTL { return }
+        _ = try? await playbackURL(fileID: fileID, allowCached: false)
     }
 
     /// Adds an offline-download task (magnet / torrent / direct URL) that saves

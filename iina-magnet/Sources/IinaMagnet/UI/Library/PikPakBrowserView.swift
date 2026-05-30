@@ -259,6 +259,13 @@ struct PikPakBrowserView: View {
         }
         .buttonStyle(.plain)
         .disabled(!file.isFolder && !playable)
+        // Warm the playback URL while the pointer is over a video row, so the
+        // click→play handoff skips the detail round-trip. Targeted (not on
+        // appear) to stay easy on PikPak's rate limit.
+        .onHover { hovering in
+            guard hovering, playable else { return }
+            Task { await PikPakDrive.shared.prefetchPlaybackURL(fileID: file.id) }
+        }
     }
 
     private func icon(for file: PikPakFile) -> String {

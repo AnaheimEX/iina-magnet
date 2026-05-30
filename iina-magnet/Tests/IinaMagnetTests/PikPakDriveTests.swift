@@ -149,6 +149,42 @@ private let listJSON = """
         #expect(url.absoluteString == "https://stream/origin")
     }
 
+    @Test func playbackURLServesFromCacheOnSecondCall() async throws {
+        let detail = #"{"id":"vid","name":"e.mkv","web_content_link":"https://dl/e.mkv"}"#
+        let stub = QueueStub(["/drive/v1/files/vid": [(200, detail)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        let u1 = try await drive.playbackURL(fileID: "vid")
+        let u2 = try await drive.playbackURL(fileID: "vid")
+        #expect(u1 == u2)
+        // Only one detail fetch — the second call hit the cache.
+        #expect(stub.gets.filter { $0.url.path.contains("/drive/v1/files/vid") }.count == 1)
+    }
+
+    @Test func prefetchWarmsCacheSoPlayDoesNotRefetch() async throws {
+        let detail = #"{"id":"vid","name":"e.mkv","web_content_link":"https://dl/e.mkv"}"#
+        let stub = QueueStub(["/drive/v1/files/vid": [(200, detail)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        await drive.prefetchPlaybackURL(fileID: "vid")
+        let url = try await drive.playbackURL(fileID: "vid")
+        #expect(url.absoluteString == "https://dl/e.mkv")
+        #expect(stub.gets.filter { $0.url.path.contains("/drive/v1/files/vid") }.count == 1)  // prefetch only
+    }
+
+    @Test func allowCachedFalseForcesRefetch() async throws {
+        let stub = QueueStub(["/drive/v1/files/vid": [
+            (200, #"{"id":"vid","name":"e.mkv","web_content_link":"https://dl/v1"}"#),
+            (200, #"{"id":"vid","name":"e.mkv","web_content_link":"https://dl/v2"}"#),
+        ]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        let u1 = try await drive.playbackURL(fileID: "vid")
+        let u2 = try await drive.playbackURL(fileID: "vid", allowCached: false)
+        #expect(u1.absoluteString == "https://dl/v1")
+        #expect(u2.absoluteString == "https://dl/v2")
+    }
+
     @Test func retriesAfterAccessTokenExpiry() async throws {
         let stub = QueueStub([
             "/drive/v1/files": [(200, #"{"error":"x","error_code":16}"#), (200, listJSON)],
