@@ -29,6 +29,7 @@ public struct MediaLibraryView: View {
     private let onOpen: (PersistentIdentifier) -> Void
     private let onScan: () -> Void
     private let onCancelScan: () -> Void
+    private let onOpenPending: (() -> Void)?
 
     @State private var section: LibrarySection = .all
     @State private var selectedTags: Set<String> = []
@@ -41,12 +42,14 @@ public struct MediaLibraryView: View {
                 displayState: LibraryDisplayState = .normal,
                 onOpen: @escaping (PersistentIdentifier) -> Void = { _ in },
                 onScan: @escaping () -> Void = {},
-                onCancelScan: @escaping () -> Void = {}) {
+                onCancelScan: @escaping () -> Void = {},
+                onOpenPending: (() -> Void)? = nil) {
         self.items = items
         self.displayState = displayState
         self.onOpen = onOpen
         self.onScan = onScan
         self.onCancelScan = onCancelScan
+        self.onOpenPending = onOpenPending
     }
 
     private var filtered: [LibraryItemViewModel] {
@@ -206,7 +209,10 @@ public struct MediaLibraryView: View {
             stat(MediaKind.unknown.displayLabel, c.byKind[.unknown] ?? 0) { section = .kind(.unknown) }
             if c.pending > 0 {
                 stat("待确认", c.pending, tint: LibraryTokens.warn) {
-                    section = .match(.pendingConfirmation)
+                    // Open the dedicated queue when the host wired it; otherwise
+                    // fall back to filtering the grid in place.
+                    if let onOpenPending { onOpenPending() }
+                    else { section = .match(.pendingConfirmation) }
                 }
             }
             Spacer()

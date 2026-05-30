@@ -65,6 +65,43 @@ public struct LibraryEditor {
     /// apply it to the title + refresh per-episode metadata + tags. The match is
     /// marked confirmed since the user explicitly picked it.
     public func applyRematch(_ details: MetadataDetails, to title: Title) throws {
+        try applyMetadata(details, to: title)
+        try context.save()
+    }
+
+    /// Re-binds a pending title to the chosen metadata, *merging* it into an
+    /// existing Title when one already represents that record (same provider id):
+    /// the source's files are migrated onto the existing Title and the now-empty
+    /// placeholder is deleted, so a manual confirmation never leaves a duplicate.
+    /// Returns the surviving Title. When no existing Title matches, the metadata
+    /// is applied to `source` in place (equivalent to `applyRematch`).
+    @discardableResult
+    public func rebind(_ source: Title, to details: MetadataDetails) throws -> Title {
+        if let target = try existingTitle(for: details, excluding: source) {
+            migrateFiles(from: source, into: target)
+            context.delete(source)
+            try applyMetadata(details, to: target)
+            try context.save()
+            return target
+        }
+        try applyMetadata(details, to: source)
+        try context.save()
+        return source
+    }
+
+    /// Titles needing attention (not confirmed), newest first — the 待确认队列.
+    public func pendingTitles() throws -> [Title] {
+        let confirmed = MatchState.confirmed.rawValue
+        var d = FetchDescriptor<Title>(predicate: #Predicate { $0.matchStateRaw != confirmed },
+                                       sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        d.includePendingChanges = true
+        return try context.fetch(d)
+    }
+
+    // MARK: - Internals
+
+    /// Copies metadata + episode info + tags + cast onto `title` (no save).
+    private func applyMetadata(_ details: MetadataDetails, to title: Title) throws {
         MetadataApplier.apply(details, to: title, matchState: .confirmed, matchScore: 1)
 
         // Refresh per-episode metadata where the new source provides it.
@@ -78,17 +115,57 @@ public struct LibraryEditor {
             }
         }
 
-        // Year / rating tags from the new source. File-derived tags (quality /
-        // release group) come from the on-disk files and are unchanged. NOTE:
-        // stale year/rating tags from the previous match are not pruned — Tags
-        // are shared many-to-many, so safe pruning needs reference counting
-        // (follow-up); the new tags are additive here.
+        // Year / rating / genre / country tags from the new source. File-derived
+        // tags (quality / release group) come from the on-disk files and are
+        // unchanged. NOTE: stale year/rating tags from the previous match are not
+        // pruned — Tags are shared many-to-many, so safe pruning needs reference
+        // counting (follow-up); the new tags are additive here.
         let derived = TagDeriver.derive(year: details.releaseYear, rating: details.rating,
                                         resolution: nil, releaseGroup: nil,
                                         genres: details.genres, countries: details.countries)
         try TagApplier.apply(derived, to: title, context: context)
         CreditApplier.apply(details.cast, to: title, context: context)
-        try context.save()
+    }
+
+    /// An existing Title (other than `source`) already bound to this record.
+    private func existingTitle(for details: MetadataDetails, excluding source: Title) throws -> Title? {
+        guard details.providerId == .bangumi, let bid = Int(details.externalId) else { return nil }
+        let sid = source.persistentModelID
+        var d = FetchDescriptor<Title>(predicate: #Predicate { $0.bangumiId == bid })
+        d.includePendingChanges = true
+        return try context.fetch(d).first { $0.persistentModelID != sid }
+    }
+
+    /// Re-parents every VersionFile (and any WatchProgress) under `source` to the
+    /// matching season/episode of `target` (creating those nodes as needed), so
+    /// deleting the source placeholder afterwards does not cascade-delete the
+    /// files or lose recorded progress.
+    private func migrateFiles(from source: Title, into target: Title) {
+        for srcSeason in source.seasons {
+            let tgtSeason = LibraryTree.season(number: srcSeason.number, in: target)
+            for srcEp in srcSeason.episodes {
+                let tgtEp = LibraryTree.episode(number: srcEp.number,
+                                                seasonNumber: srcSeason.number, in: tgtSeason)
+                for version in srcEp.versions {
+                    version.episode = tgtEp
+                    tgtEp.versions.append(version)
+                }
+                srcEp.versions.removeAll()
+            }
+        }
+
+        // Re-key watch progress to the target (kept on (title, season, episode)),
+        // skipping any the target already records for the same episode.
+        let existingKeys = Set(target.watchProgresses.map { TitleDerivations.EpisodeKey(
+            season: $0.seasonNumber ?? -1, episode: $0.episodeNumber ?? -1) })
+        for wp in source.watchProgresses {
+            let key = TitleDerivations.EpisodeKey(season: wp.seasonNumber ?? -1,
+                                                  episode: wp.episodeNumber ?? -1)
+            guard !existingKeys.contains(key) else { continue }
+            wp.title = target
+            target.watchProgresses.append(wp)
+        }
+        source.watchProgresses.removeAll()
     }
 }
 
