@@ -24,6 +24,7 @@ public actor PikPakAuth {
     private let config: PikPakConfig
     private let http: PikPakHTTPClient
     private let store: PikPakTokenStore
+    private let recapturer: PikPakCaptchaRecapturing
     private var session: PikPakSession?
     /// Last captcha token minted for drive calls (PikPak issues these per
     /// action; re-minted lazily when a call reports it expired).
@@ -31,10 +32,12 @@ public actor PikPakAuth {
 
     public init(config: PikPakConfig = .web,
                 http: PikPakHTTPClient = URLSessionPikPakClient(),
-                store: PikPakTokenStore = KeychainPikPakTokenStore()) {
+                store: PikPakTokenStore = KeychainPikPakTokenStore(),
+                recapturer: PikPakCaptchaRecapturing = PikPakCaptcha.defaultRecapturer) {
         self.config = config
         self.http = http
         self.store = store
+        self.recapturer = recapturer
         self.session = store.load()
     }
 
@@ -150,6 +153,28 @@ public actor PikPakAuth {
         }
         driveCaptchaToken = token
         return token
+    }
+
+    /// Silently re-captures a fresh captcha token from the PikPak web client
+    /// (offscreen), used when a self-signed token is rejected because the salts
+    /// rotated. Adopts the captured token (and keeps the device id it's bound to
+    /// in sync, so the X-Device-ID header matches). Throws if capture fails, so
+    /// the caller can fall back to prompting a fresh login.
+    public func recaptureCaptchaToken(timeoutSeconds: Double = 15) async throws -> String {
+        let result = try await recapturer.recapture(homeURL: config.webHomeURL,
+                                                     userAgent: config.userAgent,
+                                                     timeoutSeconds: timeoutSeconds)
+        guard !result.token.isEmpty else {
+            throw PikPakError.captchaRequired("PikPak 验证已过期，请重新登录 PikPak。")
+        }
+        driveCaptchaToken = result.token
+        if let device = result.deviceID, !device.isEmpty,
+           var current = session, current.deviceID != device {
+            current.deviceID = device
+            session = current
+            store.save(current)
+        }
+        return result.token
     }
 
     // MARK: - Auth steps

@@ -34,11 +34,15 @@ public struct PikPakConfig: Sendable {
     public var driveBaseURL: URL
     /// Sent in the captcha-init request; a fixed constant from the web client.
     public var redirectURI: String
+    /// The web client's home page; loaded (visibly at login, offscreen for a
+    /// silent captcha re-capture) so its JS mints a valid captcha token.
+    public var webHomeURL: URL
 
     public init(clientID: String, clientSecret: String, clientVersion: String,
                 packageName: String, captchaSalts: [String], userAgent: String,
                 captchaInitURL: URL, signInURL: URL, tokenURL: URL,
-                driveBaseURL: URL, redirectURI: String) {
+                driveBaseURL: URL, redirectURI: String,
+                webHomeURL: URL = URL(string: "https://mypikpak.com/")!) {
         self.clientID = clientID
         self.clientSecret = clientSecret
         self.clientVersion = clientVersion
@@ -50,6 +54,7 @@ public struct PikPakConfig: Sendable {
         self.tokenURL = tokenURL
         self.driveBaseURL = driveBaseURL
         self.redirectURI = redirectURI
+        self.webHomeURL = webHomeURL
     }
 
     /// The public PikPak **web** client. These are the values to keep in sync.
