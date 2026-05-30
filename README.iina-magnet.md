@@ -157,6 +157,20 @@ See the full disclaimer at `Magnet → Disclaimer…`.
 
 ---
 
+## Maintenance — following upstream IINA
+
+This is a fork. To merge a new upstream IINA release while keeping all custom
+features, run (with the target upstream tag):
+
+```bash
+./scripts/sync-upstream.sh v1.4.3
+```
+
+Full workflow, the fork-modification manifest, and conflict-resolution tips:
+[`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md).
+
+---
+
 ## License
 
 GPL-3.0 (inherited from upstream iina). Source: [`AnaheimEX/iina-magnet`](https://github.com/AnaheimEX/iina-magnet).
