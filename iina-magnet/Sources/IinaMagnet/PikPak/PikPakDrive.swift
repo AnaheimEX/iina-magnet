@@ -97,6 +97,9 @@ public actor PikPakDrive {
     /// detail round-trip. PikPak's signed links stay valid well beyond this TTL.
     private var playbackURLCache: [String: (url: URL, fetchedAt: Date)] = [:]
     private let playbackURLTTL: TimeInterval = 5 * 60
+    /// File ids with a prefetch in flight, so concurrent hover-prefetches of the
+    /// same file don't each hit the network (rate-limit friendliness).
+    private var prefetchingIDs: Set<String> = []
 
     public init(auth: PikPakAuth = .shared,
                 http: PikPakHTTPClient = URLSessionPikPakClient(),
@@ -162,6 +165,9 @@ public actor PikPakDrive {
     public func prefetchPlaybackURL(fileID: String) async {
         if let hit = playbackURLCache[fileID],
            Date().timeIntervalSince(hit.fetchedAt) < playbackURLTTL { return }
+        guard !prefetchingIDs.contains(fileID) else { return }   // already in flight
+        prefetchingIDs.insert(fileID)
+        defer { prefetchingIDs.remove(fileID) }
         _ = try? await playbackURL(fileID: fileID, allowCached: false)
     }
 

@@ -97,6 +97,7 @@ struct PikPakBrowserView: View {
     @State private var query = ""
     @State private var cache = PikPakListingCache()
     @State private var selectedID: String?
+    @State private var hoverPrefetch: Task<Void, Never>?
     @FocusState private var listFocused: Bool
 
     // Sort choice is remembered across sessions.
@@ -286,12 +287,17 @@ struct PikPakBrowserView: View {
         // folder / plays the video — the familiar Finder model.
         .onTapGesture(count: 2) { activate(file) }
         .onTapGesture(count: 1) { selectedID = file.id; listFocused = true }
-        // Warm the playback URL while the pointer is over a video row, so the
-        // click→play handoff skips the detail round-trip. Targeted (not on
-        // appear) to stay easy on PikPak's rate limit.
+        // Warm the playback URL once the pointer settles on a video row (~300ms
+        // debounce), so the click→play handoff skips the detail round-trip
+        // without a request per row while the cursor sweeps the list.
         .onHover { hovering in
             guard hovering, playable else { return }
-            Task { await PikPakDrive.shared.prefetchPlaybackURL(fileID: file.id) }
+            hoverPrefetch?.cancel()
+            hoverPrefetch = Task {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+                await PikPakDrive.shared.prefetchPlaybackURL(fileID: file.id)
+            }
         }
     }
 

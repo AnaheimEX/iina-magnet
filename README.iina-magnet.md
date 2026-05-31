@@ -132,6 +132,11 @@ re-watched, so it is deliberately *not* brought into the library):
 
 Polish / smaller wins (candidates):
 
+- [x] **Robust token refresh** — concurrent drive calls that all see an expired
+      token now coalesce onto one refresh, so PikPak's rotating refresh_token is
+      never used twice (which would spuriously log you out).
+- [x] **Prefetch rate-limit safety** — hover-prefetch is debounced (~300ms) and
+      deduped per file, so sweeping the list doesn't fire a request per row.
 - [ ] **Save/watch dedup awareness** — mark torrents already saved to PikPak so
       the same episode isn't fetched twice (useful given watch-once).
 - [ ] **Lightweight connection diagnostics** — make PikPak / Mikan contract

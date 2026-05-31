@@ -74,6 +74,8 @@ private final class StubPikPakClient: PikPakHTTPClient, @unchecked Sendable {
     private let lock = NSLock()
     private var routes: [String: Route]
     private(set) var requests: [StubRequest] = []
+    /// Optional latency so concurrent callers overlap (for coalescing tests).
+    var delayNanos: UInt64 = 0
 
     init(_ routes: [String: Route]) { self.routes = routes }
 
@@ -83,6 +85,7 @@ private final class StubPikPakClient: PikPakHTTPClient, @unchecked Sendable {
 
     func postJSON(_ url: URL, body: Data, headers: [String: String]) async throws -> (Data, Int) {
         lock.withLock { requests.append(StubRequest(url: url, body: body, headers: headers)) }
+        if delayNanos > 0 { try? await Task.sleep(nanoseconds: delayNanos) }
         for (path, route) in routes where url.path.contains(path) {
             return (Data(route.json.utf8), route.status)
         }
@@ -200,6 +203,28 @@ private func tokenJSON(access: String = "acc-1", refresh: String = "ref-1",
         #expect(store.load()?.refreshToken == "ref-2")    // rotated refresh token persisted
         let refresh = try #require(client.request(forPathContaining: "/v1/auth/token"))
         #expect(String(data: refresh.body, encoding: .utf8)?.contains("refresh_token") == true)
+    }
+
+    @Test func concurrentExpiredCallsCoalesceIntoOneRefresh() async throws {
+        let client = StubPikPakClient([
+            "/v1/auth/token": (200, tokenJSON(access: "acc-2", refresh: "ref-2")),
+        ])
+        client.delayNanos = 50_000_000   // keep the refresh in flight so callers overlap
+        let store = InMemoryPikPakTokenStore(
+            PikPakSession(accessToken: "old", refreshToken: "ref-1", userID: "u-42",
+                          deviceID: "dev", expiresAt: Date().addingTimeInterval(-10)))
+        let auth = PikPakAuth(config: .web, http: client, store: store)
+
+        async let a = auth.validAccessToken()
+        async let b = auth.validAccessToken()
+        async let c = auth.validAccessToken()
+        let tokens = try await [a, b, c]
+
+        #expect(tokens == ["acc-2", "acc-2", "acc-2"])
+        // Only one refresh hit the network — the rotating refresh_token is never
+        // used twice (which would have killed the session).
+        let refreshes = client.requests.filter { $0.url.path.contains("/v1/auth/token") }
+        #expect(refreshes.count == 1)
     }
 
     @Test func deadRefreshTokenClearsSession() async {

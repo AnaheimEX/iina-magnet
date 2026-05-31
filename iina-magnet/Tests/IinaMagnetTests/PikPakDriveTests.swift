@@ -19,6 +19,8 @@ private final class QueueStub: PikPakHTTPClient, @unchecked Sendable {
     private(set) var gets: [StubReq] = []
     private(set) var posts: [StubReq] = []
     private(set) var deletes: [StubReq] = []
+    /// Optional latency so concurrent callers overlap (for dedup tests).
+    var delayNanos: UInt64 = 0
 
     init(_ queues: [String: [(status: Int, json: String)]]) { self.queues = queues }
 
@@ -39,6 +41,7 @@ private final class QueueStub: PikPakHTTPClient, @unchecked Sendable {
 
     func getJSON(_ url: URL, headers: [String: String]) async throws -> (Data, Int) {
         lock.withLock { gets.append(StubReq(url: url, headers: headers, body: "")) }
+        if delayNanos > 0 { try? await Task.sleep(nanoseconds: delayNanos) }
         return pop(url)
     }
     func postJSON(_ url: URL, body: Data, headers: [String: String]) async throws -> (Data, Int) {
@@ -173,6 +176,21 @@ private let listJSON = """
         let url = try await drive.playbackURL(fileID: "vid")
         #expect(url.absoluteString == "https://dl/e.mkv")
         #expect(stub.gets.filter { $0.url.path.contains("/drive/v1/files/vid") }.count == 1)  // prefetch only
+    }
+
+    @Test func concurrentPrefetchDedupesToOneFetch() async throws {
+        let detail = #"{"id":"vid","name":"e.mkv","web_content_link":"https://dl/raw"}"#
+        let stub = QueueStub(["/drive/v1/files/vid": [(200, detail)]])
+        stub.delayNanos = 50_000_000   // keep the first fetch in flight so the second overlaps
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+
+        async let a: Void = drive.prefetchPlaybackURL(fileID: "vid")
+        async let b: Void = drive.prefetchPlaybackURL(fileID: "vid")
+        async let c: Void = drive.prefetchPlaybackURL(fileID: "vid")
+        _ = await (a, b, c)
+
+        // Only one detail fetch — concurrent prefetches of the same file dedup.
+        #expect(stub.gets.filter { $0.url.path.contains("/drive/v1/files/vid") }.count == 1)
     }
 
     @Test func allowCachedFalseForcesRefetch() async throws {
