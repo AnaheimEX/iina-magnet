@@ -24,7 +24,10 @@ private final class QueueStub: PikPakHTTPClient, @unchecked Sendable {
 
     private func pop(_ url: URL) -> (Data, Int) {
         lock.withLock {
-            for path in queues.keys where url.path.contains(path) {
+            // Longest matching key wins, so a specific path (e.g.
+            // "/drive/v1/files:batchMove" or "/drive/v1/files/vid") isn't
+            // swallowed by a prefix key ("/drive/v1/files").
+            for path in queues.keys.sorted(by: { $0.count > $1.count }) where url.path.contains(path) {
                 var arr = queues[path]!
                 let r = arr.count > 1 ? arr.removeFirst() : arr[0]
                 queues[path] = arr
@@ -185,6 +188,29 @@ private let listJSON = """
         #expect(u2.absoluteString == "https://dl/v2")
     }
 
+    @Test func waitForStreamableReturnsStreamingLink() async throws {
+        let detail = """
+        {"id":"vid","name":"e.mkv","web_content_link":"https://dl/raw","medias":[
+          {"is_origin":true,"link":{"url":"https://stream/origin"}}
+        ]}
+        """
+        let stub = QueueStub(["/drive/v1/files/vid": [(200, detail)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+        let url = try await drive.waitForStreamablePlaybackURL(fileID: "vid")
+        #expect(url.absoluteString == "https://stream/origin")   // streaming link, not the raw URL
+    }
+
+    @Test func waitForStreamableFallsBackToRawURLAfterTimeout() async throws {
+        // No media renditions yet → after the (tiny) timeout, fall back to the
+        // raw download link so playback still starts.
+        let detail = #"{"id":"vid","name":"e.mkv","web_content_link":"https://dl/raw"}"#
+        let stub = QueueStub(["/drive/v1/files/vid": [(200, detail)]])
+        let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
+        let url = try await drive.waitForStreamablePlaybackURL(fileID: "vid",
+                                                               timeoutSeconds: 0.01, pollSeconds: 0.01)
+        #expect(url.absoluteString == "https://dl/raw")
+    }
+
     @Test func retriesAfterAccessTokenExpiry() async throws {
         let stub = QueueStub([
             "/drive/v1/files": [(200, #"{"error":"x","error_code":16}"#), (200, listJSON)],
@@ -265,34 +291,46 @@ private let listJSON = """
         #expect(await auth.currentDeviceID == "newdevice123")   // device kept in sync with captcha
     }
 
-    @Test func offlineDownloadSavesIntoExistingPackFolder() async throws {
+    @Test func offlineDownloadSavesIntoExistingPackFolderAndMovesResult() async throws {
         // Root listing already has "Pack From Shared" → no folder creation.
         let folderList = #"{"files":[{"id":"pack1","kind":"drive#folder","name":"Pack From Shared"}],"next_page_token":""}"#
         let taskResp = #"{"task":{"id":"t1","file_id":"f1","file_name":"番剧.mkv","phase":"PHASE_TYPE_RUNNING"}}"#
-        let stub = QueueStub(["/drive/v1/files": [(200, folderList), (200, taskResp)]])
+        let stub = QueueStub([
+            "/drive/v1/files": [(200, folderList), (200, taskResp)],
+            "/drive/v1/files:batchMove": [(200, "{}")],
+        ])
         let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
 
         let task = try await drive.offlineDownload(url: "magnet:?xt=urn:btih:ABC&dn=x", name: "x")
         #expect(task.fileID == "f1")
         #expect(stub.gets.count == 1)        // one list call to find the folder
-        let post = try #require(stub.posts.first)
-        #expect(post.body.contains("UPLOAD_TYPE_URL"))
-        #expect(post.body.contains("magnet:?xt=urn:btih:ABC"))
-        #expect(post.body.contains("\"parent_id\":\"pack1\""))   // saved into Pack From Shared
+        let addTask = try #require(stub.posts.first { $0.url.path == "/drive/v1/files" })
+        #expect(addTask.body.contains("UPLOAD_TYPE_URL"))
+        #expect(addTask.body.contains("magnet:?xt=urn:btih:ABC"))
+        #expect(addTask.body.contains("\"parent_id\":\"pack1\""))   // saved into Pack From Shared
+        // Safety-net move forces the created file into the folder.
+        let move = try #require(stub.posts.first { $0.url.path.contains(":batchMove") })
+        #expect(move.body.contains("\"f1\""))
+        #expect(move.body.contains("\"parent_id\":\"pack1\""))
     }
 
     @Test func offlineDownloadCreatesPackFolderWhenMissing() async throws {
         let emptyRoot = #"{"files":[],"next_page_token":""}"#
         let created = #"{"file":{"id":"newpack","kind":"drive#folder","name":"Pack From Shared"}}"#
         let taskResp = #"{"task":{"id":"t1","file_id":"f1","name":"x","phase":"PHASE_TYPE_PENDING"}}"#
-        let stub = QueueStub(["/drive/v1/files": [(200, emptyRoot), (200, created), (200, taskResp)]])
+        let stub = QueueStub([
+            "/drive/v1/files": [(200, emptyRoot), (200, created), (200, taskResp)],
+            "/drive/v1/files:batchMove": [(200, "{}")],
+        ])
         let drive = PikPakDrive(auth: signedInAuth(stub), http: stub, config: .web)
 
         let task = try await drive.offlineDownload(url: "magnet:?xt=urn:btih:Z", name: "x")
         #expect(task.fileID == "f1")
-        #expect(stub.posts.count == 2)       // create folder + add task
-        #expect(stub.posts[0].body.contains("drive#folder"))
-        #expect(stub.posts[1].body.contains("\"parent_id\":\"newpack\""))
+        let addPosts = stub.posts.filter { $0.url.path == "/drive/v1/files" }
+        #expect(addPosts.count == 2)         // create folder + add task
+        #expect(addPosts[0].body.contains("drive#folder"))
+        #expect(addPosts[1].body.contains("\"parent_id\":\"newpack\""))
+        #expect(stub.posts.contains { $0.url.path.contains(":batchMove") && $0.body.contains("\"parent_id\":\"newpack\"") })
     }
 
     @Test func nonRetryableErrorIsThrown() async {
@@ -377,7 +415,8 @@ private let listJSON = """
         let new = try await drive.retryTask(task)
         #expect(new.fileID == "f2")
         #expect(stub.deletes.contains { $0.url.query?.contains("task_ids=t1") == true })
-        #expect(stub.posts.last?.body.contains("magnet:?xt=urn:btih:ABC") == true)
+        // The re-submitted offline task carries the original source URL.
+        #expect(stub.posts.contains { $0.url.path == "/drive/v1/files" && $0.body.contains("magnet:?xt=urn:btih:ABC") })
     }
 
     @Test func retryWithoutSourceURLThrows() async {
