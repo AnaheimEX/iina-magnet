@@ -117,11 +117,13 @@ re-watched, so it is deliberately *not* brought into the library):
 - [x] **Faster "click → playing"** — the playback URL is prefetched on row
       hover and served from a short-lived cache, so the click→play handoff skips
       the detail round-trip.
-- [x] **Faster first frame** — the remote-playback mpv profile now starts
-      without pre-filling the cache and probes far less of the stream before
-      deciding its format (the big first-frame win on a high-latency link),
-      while keeping the generous buffer for smoothness. Probe defaults are
-      restored for local files. *Worth A/B-ing on your machine.*
+- [x] **Faster first frame + proxied throughput** — the remote-playback mpv
+      profile starts without pre-filling the cache and probes far less of the
+      stream before deciding its format (the big first-frame win on a
+      high-latency link), keeps a generous buffer for smoothness, and reuses one
+      keep-alive connection across byte-range requests (`multiple_requests=1`)
+      so a Surge-proxied overseas CDN doesn't re-handshake per range. Probe
+      defaults are restored for local files. *Worth A/B-ing on your machine.*
 - [x] **Smoother discovery** — the Mikan browser has real web navigation
       (back / forward / reload / home + trackpad swipe), so drilling into a
       bangumi page is no longer a dead end.

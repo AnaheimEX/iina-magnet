@@ -132,7 +132,11 @@ public struct MikanView: View {
             busy = true
             defer { busy = false; pending = nil }
             do {
-                let task = try await PikPakDrive.shared.offlineDownload(url: torrent.url, name: torrent.name)
+                // Let PikPak name the file from the torrent's own metadata (the
+                // real release filename). The page-scraped title is only for the
+                // confirmation UI — using it as the save name produced names that
+                // didn't match the actual file.
+                let task = try await PikPakDrive.shared.offlineDownload(url: torrent.url, name: "")
                 Self.logger.info("offline task added: \(task.id, privacy: .public)")
                 if play, !task.fileID.isEmpty {
                     showToast("已添加，正在 PikPak 缓存以便流畅播放…")
