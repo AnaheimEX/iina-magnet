@@ -523,4 +523,14 @@ private let listJSON = """
         cache.invalidateAll()
         #expect(cache.entries(for: "f1") == nil)
     }
+
+    @Test func cacheEvictsOldestFoldersPastTheCap() {
+        let cache = PikPakListingCache()
+        for i in 0..<60 { cache.store([file("x\(i)", "x\(i).mp4")], for: "folder\(i)") }
+        // Cap is 40 → the 20 oldest are evicted, the newest 40 retained.
+        #expect(cache.entries(for: "folder0") == nil)
+        #expect(cache.entries(for: "folder19") == nil)
+        #expect(cache.entries(for: "folder20") != nil)
+        #expect(cache.entries(for: "folder59") != nil)
+    }
 }

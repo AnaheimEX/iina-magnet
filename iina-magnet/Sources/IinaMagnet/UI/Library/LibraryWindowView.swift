@@ -188,7 +188,7 @@ private struct ArchiveScreen: View {
                     onMarkUnmatched: { try? editor.markUnmatched(title) },
                     onMatchSheet: { showMatchSheet = true },
                     onToggleWatched: { watched in
-                        try? WatchProgressWriter(context: context).setWatched(watched, for: title)
+                        _ = try? WatchProgressWriter(context: context).setWatched(watched, for: title)
                     })
             .sheet(isPresented: $showMatchSheet) {
                 ManualMatchSheet(
