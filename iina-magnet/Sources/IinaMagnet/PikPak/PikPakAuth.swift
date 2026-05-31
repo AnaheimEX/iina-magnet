@@ -26,6 +26,11 @@ public actor PikPakAuth {
     private let store: PikPakTokenStore
     private let recapturer: PikPakCaptchaRecapturing
     private var session: PikPakSession?
+    /// In-flight token refresh, so concurrent drive calls that all see an
+    /// expired token coalesce onto ONE refresh. PikPak rotates the refresh
+    /// token, so a second concurrent refresh would use a now-invalid token and
+    /// kill the session.
+    private var refreshTask: Task<String, Error>?
     /// Last captcha token minted for drive calls (PikPak issues these per
     /// action; re-minted lazily when a call reports it expired).
     private var driveCaptchaToken = ""
@@ -83,19 +88,12 @@ public actor PikPakAuth {
         Self.logger.info("adopted web session (sub=\(newSession.userID, privacy: .private(mask: .hash)))")
     }
 
-    /// A valid access token, refreshing transparently if it's near expiry.
+    /// A valid access token, refreshing transparently (and coalesced) if it's
+    /// near expiry.
     public func validAccessToken() async throws -> String {
-        guard var current = session else { throw PikPakError.notAuthenticated }
+        guard let current = session else { throw PikPakError.notAuthenticated }
         guard current.isExpired else { return current.accessToken }
-
-        let token = try await postRefresh(refreshToken: current.refreshToken)
-        current.accessToken = token.access_token
-        current.refreshToken = token.refresh_token
-        if let sub = token.sub, !sub.isEmpty { current.userID = sub }
-        current.expiresAt = Date().addingTimeInterval(TimeInterval(token.expires_in ?? 7200))
-        session = current
-        store.save(current)
-        return current.accessToken
+        return try await refreshAccessToken()
     }
 
     public func signOut() {
@@ -112,8 +110,17 @@ public actor PikPakAuth {
     public var currentCaptchaToken: String { driveCaptchaToken }
 
     /// Forces an access-token refresh (used when PikPak rejects a token the
-    /// client still considered valid).
+    /// client still considered valid). Concurrent callers coalesce onto one
+    /// in-flight refresh so the rotating refresh_token is never used twice.
     public func refreshAccessToken() async throws -> String {
+        if let existing = refreshTask { return try await existing.value }
+        let task = Task { try await self.performRefresh() }
+        refreshTask = task
+        defer { refreshTask = nil }
+        return try await task.value
+    }
+
+    private func performRefresh() async throws -> String {
         guard let current = session else { throw PikPakError.notAuthenticated }
         let token = try await postRefresh(refreshToken: current.refreshToken)
         var updated = current
