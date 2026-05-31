@@ -441,6 +441,20 @@ private let listJSON = """
         #expect(PikPakBrowsing.filtered(input, query: "无此").isEmpty)
     }
 
+    @Test func selectionIndexClampsAndStartsAtFirst() {
+        // Nothing selected → first row.
+        #expect(PikPakBrowsing.nextSelectionIndex(count: 3, current: nil, delta: 1) == 0)
+        #expect(PikPakBrowsing.nextSelectionIndex(count: 3, current: nil, delta: -1) == 0)
+        // Move within bounds.
+        #expect(PikPakBrowsing.nextSelectionIndex(count: 3, current: 1, delta: 1) == 2)
+        #expect(PikPakBrowsing.nextSelectionIndex(count: 3, current: 1, delta: -1) == 0)
+        // Clamp at the ends.
+        #expect(PikPakBrowsing.nextSelectionIndex(count: 3, current: 2, delta: 1) == 2)
+        #expect(PikPakBrowsing.nextSelectionIndex(count: 3, current: 0, delta: -1) == 0)
+        // Empty list → no selection.
+        #expect(PikPakBrowsing.nextSelectionIndex(count: 0, current: nil, delta: 1) == nil)
+    }
+
     @Test func cacheRoundTripsAndInvalidates() {
         let cache = PikPakListingCache()
         #expect(cache.entries(for: "f1") == nil)
