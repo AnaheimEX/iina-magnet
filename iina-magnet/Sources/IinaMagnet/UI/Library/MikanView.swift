@@ -16,13 +16,20 @@ public struct MikanView: View {
     private static let logger = Logger(subsystem: "iina-magnet", category: "mikan")
 
     private let onBack: () -> Void
+    /// Web-page zoom, sized to the window/display so the page lays out fully and
+    /// stays readable (the page reflows at this zoom rather than being shrunk
+    /// then magnified by the library window's uniform scale).
+    private let pageZoom: CGFloat
 
     @State private var pending: Torrent?
     @State private var busy = false
     @State private var toast: String?
     @StateObject private var navigator = MikanWebNavigator()
 
-    public init(onBack: @escaping () -> Void = {}) { self.onBack = onBack }
+    public init(onBack: @escaping () -> Void = {}, pageZoom: CGFloat = 1) {
+        self.onBack = onBack
+        self.pageZoom = pageZoom
+    }
 
     struct Torrent: Identifiable, Equatable {
         let id = UUID()
@@ -34,7 +41,7 @@ public struct MikanView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(LibraryTokens.sep)
-            MikanWebView(navigator: navigator) { name, url in
+            MikanWebView(navigator: navigator, pageZoom: pageZoom) { name, url in
                 pending = Torrent(name: name, url: url)
             }
         }
@@ -132,11 +139,10 @@ public struct MikanView: View {
             busy = true
             defer { busy = false; pending = nil }
             do {
-                // Let PikPak name the file from the torrent's own metadata (the
-                // real release filename). The page-scraped title is only for the
-                // confirmation UI — using it as the save name produced names that
-                // didn't match the actual file.
-                let task = try await PikPakDrive.shared.offlineDownload(url: torrent.url, name: "")
+                // Name the save with the episode's release title scraped from the
+                // row (e.g. "[字幕组][番名][第N集]…"). Mikan magnets carry no `dn`,
+                // so without this PikPak can't name a magnet task meaningfully.
+                let task = try await PikPakDrive.shared.offlineDownload(url: torrent.url, name: torrent.name)
                 Self.logger.info("offline task added: \(task.id, privacy: .public)")
                 if play, !task.fileID.isEmpty {
                     showToast("已添加，正在 PikPak 缓存以便流畅播放…")
@@ -209,6 +215,7 @@ private struct MikanWebView: NSViewRepresentable {
     static let messageName = "mikanTorrent"
 
     var navigator: MikanWebNavigator
+    var pageZoom: CGFloat
     var onCapture: (_ name: String, _ url: String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(navigator: navigator, onCapture: onCapture) }
@@ -225,12 +232,15 @@ private struct MikanWebView: NSViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true     // trackpad swipe back/forward
+        webView.pageZoom = pageZoom
         navigator.webView = webView
         webView.load(URLRequest(url: MikanWebNavigator.homeURL))
         return webView
     }
 
-    func updateNSView(_ nsView: WKWebView, context: Context) {}
+    func updateNSView(_ nsView: WKWebView, context: Context) {
+        if abs(nsView.pageZoom - pageZoom) > 0.01 { nsView.pageZoom = pageZoom }
+    }
 
     static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
         nsView.configuration.userContentController.removeScriptMessageHandler(forName: messageName)
@@ -243,14 +253,21 @@ private struct MikanWebView: NSViewRepresentable {
     private static let clickScript = """
     (function() {
       function titleFor(el) {
-        var row = el.closest('tr');
-        if (row) {
-          var cell = row.querySelector('td');
-          var t = (cell && cell.innerText || '').trim();
-          if (t) return t.split('\\n')[0].trim();
+        // Mikan's rows aren't a <table>: the release title is an
+        // <a class="magnet-link-wrap"> sibling of the magnet / .torrent button.
+        // Climb a few ancestors to the row container and read that title — NOT
+        // the page's overall bangumi title.
+        var node = el;
+        for (var i = 0; i < 6 && node; i++) {
+          if (node.querySelector) {
+            var t = node.querySelector('a.magnet-link-wrap');
+            if (t && t.innerText && t.innerText.trim()) return t.innerText.trim();
+          }
+          node = node.parentElement;
         }
-        var header = document.querySelector('.bangumi-title, p.bangumi-title, .an-text');
-        if (header && header.innerText.trim()) return header.innerText.trim();
+        // Episode detail page fallbacks.
+        var header = document.querySelector('.magnet-link-wrap, .episode-title, .bangumi-title, p.bangumi-title');
+        if (header && header.innerText && header.innerText.trim()) return header.innerText.trim();
         return (document.title || '').replace(/\\s*[-|]\\s*Mikan.*$/i, '').trim();
       }
       document.addEventListener('click', function(e) {

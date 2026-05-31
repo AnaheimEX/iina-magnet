@@ -125,8 +125,10 @@ re-watched, so it is deliberately *not* brought into the library):
       so a Surge-proxied overseas CDN doesn't re-handshake per range. Probe
       defaults are restored for local files. *Worth A/B-ing on your machine.*
 - [x] **Smoother discovery** — the Mikan browser has real web navigation
-      (back / forward / reload / home + trackpad swipe), so drilling into a
-      bangumi page is no longer a dead end.
+      (back / forward / reload / home + trackpad swipe), reads the episode's
+      release title from the row (so saves are named correctly, not after the
+      whole show), and renders at the real window size with a display-adaptive
+      page zoom so the page lays out fully and stays sharp.
 
 Polish / smaller wins (candidates):
 
