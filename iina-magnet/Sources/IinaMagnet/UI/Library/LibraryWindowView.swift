@@ -56,14 +56,26 @@ public struct LibraryWindowView: View {
 
     public var body: some View {
         GeometryReader { geo in
-            content
-                // Lay out on a (window / scale) canvas, then scale up to fill the
-                // window so every element grows uniformly.
-                .frame(width: geo.size.width / max(scale, 0.01),
-                       height: geo.size.height / max(scale, 0.01))
-                .scaleEffect(scale, anchor: .topLeading)
+            if showMikan {
+                // The Mikan web page manages its own zoom, so render it at the
+                // real window size (outside the uniform scaleEffect): otherwise
+                // it's laid out on the shrunken canvas then magnified, which cuts
+                // off content and blurs text.
+                MikanView(onBack: { showMikan = false }, pageZoom: mikanZoom)
+            } else {
+                content
+                    // Lay out on a (window / scale) canvas, then scale up to fill
+                    // the window so every element grows uniformly.
+                    .frame(width: geo.size.width / max(scale, 0.01),
+                           height: geo.size.height / max(scale, 0.01))
+                    .scaleEffect(scale, anchor: .topLeading)
+            }
         }
     }
+
+    /// Web-page zoom for Mikan, derived from the display-adaptive `scale` but
+    /// kept gentle (web content reflows at this zoom; too high would overflow).
+    private var mikanZoom: CGFloat { min(max(scale * 0.8, 1.0), 1.5) }
 
     @ViewBuilder
     private var content: some View {
@@ -79,8 +91,6 @@ public struct LibraryWindowView: View {
                     onConfirm: confirm)
             } else if showPikPak {
                 PikPakView(onBack: { showPikPak = false })
-            } else if showMikan {
-                MikanView(onBack: { showMikan = false })
             } else {
                 MediaLibraryView(items: items,
                                  displayState: displayState,
