@@ -122,6 +122,18 @@ re-watched, so it is deliberately *not* brought into the library):
       deciding its format (the big first-frame win on a high-latency link),
       while keeping the generous buffer for smoothness. Probe defaults are
       restored for local files. *Worth A/B-ing on your machine.*
+- [x] **Smoother discovery** — the Mikan browser has real web navigation
+      (back / forward / reload / home + trackpad swipe), so drilling into a
+      bangumi page is no longer a dead end.
+
+Polish / smaller wins (candidates):
+
+- [ ] **Save/watch dedup awareness** — mark torrents already saved to PikPak so
+      the same episode isn't fetched twice (useful given watch-once).
+- [ ] **Lightweight connection diagnostics** — make PikPak / Mikan contract
+      breakage legible instead of an opaque failure.
+- [ ] **Browser niceties** — remember the sort choice, double-click / Enter to
+      play.
 
 Lower priority (local library is only used occasionally; cloud is watch-once):
 
