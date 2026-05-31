@@ -20,6 +20,7 @@ public struct MikanView: View {
     @State private var pending: Torrent?
     @State private var busy = false
     @State private var toast: String?
+    @StateObject private var navigator = MikanWebNavigator()
 
     public init(onBack: @escaping () -> Void = {}) { self.onBack = onBack }
 
@@ -33,7 +34,7 @@ public struct MikanView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(LibraryTokens.sep)
-            MikanWebView { name, url in
+            MikanWebView(navigator: navigator) { name, url in
                 pending = Torrent(name: name, url: url)
             }
         }
@@ -53,6 +54,7 @@ public struct MikanView: View {
                 Text("蜜柑计划").font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(LibraryTokens.text)
             }
+            navButtons
             Spacer()
             Text("点击磁力 / 种子可保存到 PikPak").font(.system(size: 11))
                 .foregroundStyle(LibraryTokens.text3)
@@ -60,6 +62,25 @@ public struct MikanView: View {
         .padding(.horizontal, 14)
         .frame(height: LibraryTokens.Spacing.toolbarHeight)
         .background(.ultraThinMaterial)
+    }
+
+    private var navButtons: some View {
+        HStack(spacing: 12) {
+            navButton("chevron.backward", help: "后退", enabled: navigator.canGoBack) { navigator.goBack() }
+            navButton("chevron.forward", help: "前进", enabled: navigator.canGoForward) { navigator.goForward() }
+            navButton("arrow.clockwise", help: "刷新") { navigator.reload() }
+            navButton("house", help: "蜜柑首页") { navigator.goHome() }
+        }
+        .padding(.leading, 6)
+    }
+
+    private func navButton(_ icon: String, help: String, enabled: Bool = true,
+                           _ action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: icon).font(.system(size: 12)) }
+            .buttonStyle(.plain)
+            .foregroundStyle(enabled ? LibraryTokens.text2 : LibraryTokens.text3.opacity(0.5))
+            .disabled(!enabled)
+            .help(help)
     }
 
     // MARK: Action sheet
@@ -152,14 +173,39 @@ enum MikanTitle {
     }
 }
 
+// MARK: - Web navigation
+
+/// Bridges the SwiftUI nav buttons to the underlying WKWebView: holds a weak
+/// reference to it and publishes whether back/forward are available so the
+/// buttons enable/disable correctly.
+@MainActor
+final class MikanWebNavigator: ObservableObject {
+    static let homeURL = URL(string: "https://mikanani.me/")!
+
+    @Published var canGoBack = false
+    @Published var canGoForward = false
+    fileprivate weak var webView: WKWebView?
+
+    func goBack() { webView?.goBack() }
+    func goForward() { webView?.goForward() }
+    func reload() { webView?.reload() }
+    func goHome() { webView?.load(URLRequest(url: Self.homeURL)) }
+
+    fileprivate func sync(_ webView: WKWebView) {
+        canGoBack = webView.canGoBack
+        canGoForward = webView.canGoForward
+    }
+}
+
 // MARK: - Web view
 
 private struct MikanWebView: NSViewRepresentable {
     static let messageName = "mikanTorrent"
 
+    var navigator: MikanWebNavigator
     var onCapture: (_ name: String, _ url: String) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture) }
+    func makeCoordinator() -> Coordinator { Coordinator(navigator: navigator, onCapture: onCapture) }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -172,7 +218,9 @@ private struct MikanWebView: NSViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
-        webView.load(URLRequest(url: URL(string: "https://mikanani.me/")!))
+        webView.allowsBackForwardNavigationGestures = true     // trackpad swipe back/forward
+        navigator.webView = webView
+        webView.load(URLRequest(url: MikanWebNavigator.homeURL))
         return webView
     }
 
@@ -214,8 +262,21 @@ private struct MikanWebView: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        private let navigator: MikanWebNavigator
         private let onCapture: (_ name: String, _ url: String) -> Void
-        init(onCapture: @escaping (_ name: String, _ url: String) -> Void) { self.onCapture = onCapture }
+        init(navigator: MikanWebNavigator,
+             onCapture: @escaping (_ name: String, _ url: String) -> Void) {
+            self.navigator = navigator
+            self.onCapture = onCapture
+        }
+
+        // Keep the back/forward button state in sync as pages load.
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            navigator.sync(webView)
+        }
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            navigator.sync(webView)
+        }
 
         // Primary path: the injected click listener posts {name, url}.
         func userContentController(_ controller: WKUserContentController,
