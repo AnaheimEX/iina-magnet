@@ -48,6 +48,12 @@ final class IinaMagnetBridgeImpl: NSObject, IinaBridge {
             player.mpv.setDouble(MPVOption.Demuxer.demuxerLavfAnalyzeduration, 1)        // 1 s
             // Don't hang indefinitely on a stalled connection.
             player.mpv.setInt(MPVOption.Network.networkTimeout, 60)
+            // Reuse one keep-alive connection for the many byte-range requests
+            // (a fresh TLS handshake through the Surge proxy on every range is a
+            // big cost on an overseas CDN) and auto-reconnect across transient
+            // drops. multiple_requests=1 is the main throughput win when proxied.
+            _ = player.mpv.setString(MPVOption.Miscellaneous.streamLavfO,
+                "multiple_requests=1,reconnect=1,reconnect_streamed=1,reconnect_delay_max=5")
             // Generous demuxer buffer for smooth playback once started (filled
             // in the background; does not delay the first frame).
             player.mpv.setInt(MPVOption.Demuxer.demuxerMaxBytes, 256 * 1024 * 1024)      // 256 MiB
