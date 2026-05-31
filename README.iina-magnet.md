@@ -132,8 +132,9 @@ Polish / smaller wins (candidates):
       the same episode isn't fetched twice (useful given watch-once).
 - [ ] **Lightweight connection diagnostics** — make PikPak / Mikan contract
       breakage legible instead of an opaque failure.
-- [ ] **Browser niceties** — remember the sort choice, double-click / Enter to
-      play.
+- [x] **Browser niceties** — the PikPak browser remembers the sort choice
+      (persisted), single-click selects / double-click opens (no accidental
+      playback), and ↑/↓ + Return/Space drive it from the keyboard.
 
 Lower priority (local library is only used occasionally; cloud is watch-once):
 

@@ -52,6 +52,14 @@ enum PikPakBrowsing {
         a < b ? .orderedAscending : (a > b ? .orderedDescending : .orderedSame)
     }
 
+    /// The index to select after moving `delta` rows from `current` within a
+    /// list of `count` rows: clamps to the ends, and starts at the first row
+    /// when nothing is selected. Returns nil for an empty list.
+    static func nextSelectionIndex(count: Int, current: Int?, delta: Int) -> Int? {
+        guard count > 0 else { return nil }
+        return current.map { min(max($0 + delta, 0), count - 1) } ?? 0
+    }
+
     /// Instant in-folder filter: case- and diacritic-insensitive substring on
     /// the file name. Empty query returns everything unchanged.
     static func filtered(_ files: [PikPakFile], query: String) -> [PikPakFile] {
@@ -86,9 +94,17 @@ struct PikPakBrowserView: View {
     @State private var phase: Phase = .loading
     @State private var openingID: String?
     @State private var openError: String?
-    @State private var sort: PikPakSort = .default
     @State private var query = ""
     @State private var cache = PikPakListingCache()
+    @State private var selectedID: String?
+    @FocusState private var listFocused: Bool
+
+    // Sort choice is remembered across sessions.
+    @AppStorage("pikpak.browser.sortKey") private var sortKeyRaw = PikPakSortKey.name.rawValue
+    @AppStorage("pikpak.browser.sortAscending") private var sortAscending = true
+    private var sort: PikPakSort {
+        PikPakSort(key: PikPakSortKey(rawValue: sortKeyRaw) ?? .name, ascending: sortAscending)
+    }
 
     private var currentID: String { stack.last?.id ?? "" }
 
@@ -104,9 +120,9 @@ struct PikPakBrowserView: View {
             Divider().overlay(LibraryTokens.sep)
             content
         }
-        // New folder → drop any stale filter, then load (cache makes back-nav
-        // instant).
-        .task(id: currentID) { query = ""; await load() }
+        // New folder → drop any stale filter/selection, then load (cache makes
+        // back-nav instant).
+        .task(id: currentID) { query = ""; selectedID = nil; await load() }
     }
 
     // MARK: Breadcrumb
@@ -163,8 +179,8 @@ struct PikPakBrowserView: View {
         Menu {
             ForEach(PikPakSortKey.allCases, id: \.self) { key in
                 Button {
-                    if sort.key == key { sort.ascending.toggle() }
-                    else { sort = PikPakSort(key: key, ascending: key == .name) }
+                    if sort.key == key { sortAscending.toggle() }
+                    else { sortKeyRaw = key.rawValue; sortAscending = (key == .name) }
                 } label: {
                     HStack {
                         Text(key.label)
@@ -229,36 +245,47 @@ struct PikPakBrowserView: View {
             }
             .padding(.vertical, 8)
         }
+        // Keyboard control over the listing: ↑/↓ move the selection, Return /
+        // Space open the selected folder or play the selected video.
+        .focusable()
+        .focused($listFocused)
+        .focusEffectDisabled()
+        .onKeyPress(.upArrow)   { moveSelection(-1); return .handled }
+        .onKeyPress(.downArrow) { moveSelection(1);  return .handled }
+        .onKeyPress(.return)    { activateSelected(); return .handled }
+        .onKeyPress(.space)     { activateSelected(); return .handled }
+        .task { listFocused = true }
     }
 
     private func row(_ file: PikPakFile) -> some View {
         let playable = !file.isFolder && file.isVideo
-        return Button {
-            if file.isFolder { stack.append(Folder(id: file.id, name: file.name)) }
-            else if playable { Task { await open(file) } }
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: icon(for: file)).font(.system(size: 14))
-                    .frame(width: 20)
-                    .foregroundStyle(file.isFolder ? LibraryTokens.accent
-                                     : (playable ? LibraryTokens.text : LibraryTokens.text3))
-                Text(file.name).font(.system(size: 13)).lineLimit(1)
-                    .foregroundStyle(file.isFolder || playable ? LibraryTokens.text : LibraryTokens.text3)
-                Spacer(minLength: 8)
-                if openingID == file.id {
-                    ProgressView().controlSize(.small)
-                } else if !file.isFolder, file.size > 0 {
-                    Text(LibraryFormatting.size(file.size)).font(.system(size: 11)).monospacedDigit()
-                        .foregroundStyle(LibraryTokens.text3)
-                } else if file.isFolder {
-                    Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(LibraryTokens.text3)
-                }
+        let selected = selectedID == file.id
+        return HStack(spacing: 10) {
+            Image(systemName: icon(for: file)).font(.system(size: 14))
+                .frame(width: 20)
+                .foregroundStyle(file.isFolder ? LibraryTokens.accent
+                                 : (playable ? LibraryTokens.text : LibraryTokens.text3))
+            Text(file.name).font(.system(size: 13)).lineLimit(1)
+                .foregroundStyle(file.isFolder || playable ? LibraryTokens.text : LibraryTokens.text3)
+            Spacer(minLength: 8)
+            if openingID == file.id {
+                ProgressView().controlSize(.small)
+            } else if !file.isFolder, file.size > 0 {
+                Text(LibraryFormatting.size(file.size)).font(.system(size: 11)).monospacedDigit()
+                    .foregroundStyle(LibraryTokens.text3)
+            } else if file.isFolder {
+                Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(LibraryTokens.text3)
             }
-            .padding(.horizontal, 14).padding(.vertical, 7)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(!file.isFolder && !playable)
+        .padding(.horizontal, 14).padding(.vertical, 7)
+        .background(selected ? LibraryTokens.accent.opacity(0.18) : .clear,
+                    in: RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 6)
+        .contentShape(Rectangle())
+        // Single click selects (no accidental playback); double click opens the
+        // folder / plays the video — the familiar Finder model.
+        .onTapGesture(count: 2) { activate(file) }
+        .onTapGesture(count: 1) { selectedID = file.id; listFocused = true }
         // Warm the playback URL while the pointer is over a video row, so the
         // click→play handoff skips the detail round-trip. Targeted (not on
         // appear) to stay easy on PikPak's rate limit.
@@ -266,6 +293,27 @@ struct PikPakBrowserView: View {
             guard hovering, playable else { return }
             Task { await PikPakDrive.shared.prefetchPlaybackURL(fileID: file.id) }
         }
+    }
+
+    /// Opens a folder (drill in) or plays a video; no-op for other files.
+    private func activate(_ file: PikPakFile) {
+        if file.isFolder { stack.append(Folder(id: file.id, name: file.name)) }
+        else if file.isVideo { Task { await open(file) } }
+    }
+
+    private func activateSelected() {
+        guard let id = selectedID, let file = visibleEntries.first(where: { $0.id == id }) else { return }
+        activate(file)
+    }
+
+    /// Moves the selection by `delta` within the visible list, clamping to the
+    /// ends; selects the first row when nothing is selected yet.
+    private func moveSelection(_ delta: Int) {
+        let items = visibleEntries
+        let current = items.firstIndex { $0.id == selectedID }
+        guard let next = PikPakBrowsing.nextSelectionIndex(count: items.count,
+                                                           current: current, delta: delta) else { return }
+        selectedID = items[next].id
     }
 
     private func icon(for file: PikPakFile) -> String {
