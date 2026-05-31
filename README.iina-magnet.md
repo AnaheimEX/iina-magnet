@@ -96,6 +96,10 @@ contents up so everything stays comfortably clickable.
   (`// MARK: iina-magnet hook`): `iina/IinaMagnetBridge.swift` (new),
   `iina/AppDelegate.swift`, `iina/InitialWindowController.swift`.
 - This keeps the fork easy to maintain — see **Following upstream** below.
+- **Continuing development?** Start from
+  [`docs/DEV_STATUS.md`](docs/DEV_STATUS.md): current state, the workflow
+  assumptions that drive priorities, gotchas (PikPak/Mikan internals), and the
+  optimization / feature backlog.
 
 ---
 
