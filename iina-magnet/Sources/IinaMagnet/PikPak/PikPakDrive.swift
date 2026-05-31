@@ -9,6 +9,7 @@
 //  token (9) and retries.
 
 import Foundation
+import OSLog
 
 // MARK: - Public model
 
@@ -81,6 +82,7 @@ public struct PikPakTask: Sendable, Equatable, Identifiable {
 
 public actor PikPakDrive {
     public static let shared = PikPakDrive()
+    private static let logger = Logger(subsystem: "iina-magnet", category: "pikpak-drive")
 
     private let auth: PikPakAuth
     private let http: PikPakHTTPClient
@@ -105,7 +107,13 @@ public actor PikPakDrive {
     }
 
     /// Lists a folder's children (parentID "" = root), following pagination.
-    public func list(parentID: String = "") async throws -> [PikPakFile] {
+    /// `onlyCompleted` (default) hides in-progress downloads from the browser;
+    /// folder lookups pass `false` so an existing folder is always found
+    /// (avoiding spurious duplicate folders).
+    public func list(parentID: String = "", onlyCompleted: Bool = true) async throws -> [PikPakFile] {
+        let filter = onlyCompleted
+            ? #"{"phase":{"eq":"PHASE_TYPE_COMPLETE"},"trashed":{"eq":false}}"#
+            : #"{"trashed":{"eq":false}}"#
         var files: [PikPakFile] = []
         var pageToken: String? = ""           // "" → first page
         repeat {
@@ -114,7 +122,7 @@ public actor PikPakDrive {
                 "thumbnail_size": "SIZE_LARGE",
                 "with_audit": "true",
                 "limit": "100",
-                "filters": #"{"phase":{"eq":"PHASE_TYPE_COMPLETE"},"trashed":{"eq":false}}"#,
+                "filters": filter,
                 "page_token": pageToken ?? "",
             ]
             let data = try await authorizedGet(path: "/drive/v1/files", query: query)
@@ -126,6 +134,11 @@ public actor PikPakDrive {
         return files
     }
 
+    private func fetchFile(_ fileID: String) async throws -> PPFile {
+        let data = try await authorizedGet(path: "/drive/v1/files/\(fileID)", query: [:])
+        return try decode(PPFile.self, from: data)
+    }
+
     /// A directly playable URL for a video file. Served from the short-lived
     /// cache when warm (so click→play is instant); otherwise fetches the file
     /// detail and caches the resolved link. Pass `allowCached: false` to force a
@@ -135,8 +148,7 @@ public actor PikPakDrive {
            Date().timeIntervalSince(hit.fetchedAt) < playbackURLTTL {
             return hit.url
         }
-        let data = try await authorizedGet(path: "/drive/v1/files/\(fileID)", query: [:])
-        let file = try decode(PPFile.self, from: data)
+        let file = try await fetchFile(fileID)
         guard let url = file.bestPlaybackURL else {
             throw PikPakError.api(code: -1, message: "该文件没有可播放的链接")
         }
@@ -160,6 +172,7 @@ public actor PikPakDrive {
     @discardableResult
     public func offlineDownload(url: String, name: String = "") async throws -> PikPakTask {
         let parent = try await offlineFolderID()
+        Self.logger.info("offline download → folder \(self.offlineFolderName, privacy: .public) (\(parent, privacy: .public))")
         let request = OfflineDownloadRequest(
             name: name,
             url: .init(url: url),
@@ -170,7 +183,21 @@ public actor PikPakDrive {
         guard let task = resp.task?.asTask else {
             throw PikPakError.api(code: -3, message: "PikPak 未返回离线任务")
         }
+        // Safety net: PikPak doesn't always honour parent_id on an offline task
+        // (the file can land at the drive root). Force the created file into the
+        // target folder so saves are reliably grouped. Best-effort.
+        if !task.fileID.isEmpty {
+            do { try await moveFiles(ids: [task.fileID], toParentID: parent) }
+            catch { Self.logger.error("post-download move into folder failed: \(error.localizedDescription, privacy: .public)") }
+        }
         return task
+    }
+
+    /// Moves files into a target folder (PikPak `files:batchMove`).
+    public func moveFiles(ids: [String], toParentID: String) async throws {
+        guard !ids.isEmpty else { return }
+        let body = BatchMoveRequest(ids: ids, to: .init(parent_id: toParentID))
+        _ = try await authorizedPost(path: "/drive/v1/files:batchMove", body: body)
     }
 
     /// Id of the offline-download target folder, resolved (find-or-create) once
@@ -183,7 +210,9 @@ public actor PikPakDrive {
     }
 
     private func findOrCreateFolder(named name: String, parentID: String) async throws -> String {
-        if let existing = try await list(parentID: parentID).first(where: {
+        // Unfiltered listing (not phase==COMPLETE) so an existing folder is
+        // always found — otherwise we'd keep creating duplicate folders.
+        if let existing = try await list(parentID: parentID, onlyCompleted: false).first(where: {
             $0.isFolder && $0.name.caseInsensitiveCompare(name) == .orderedSame
         }) {
             return existing.id
@@ -206,6 +235,27 @@ public actor PikPakDrive {
             if let url = try? await playbackURL(fileID: fileID) { return url }
             if Date() >= deadline {
                 throw PikPakError.api(code: -4, message: "文件仍在下载中，请稍后在 PikPak 网盘里播放")
+            }
+            try await Task.sleep(nanoseconds: UInt64(pollSeconds * 1_000_000_000))
+        }
+    }
+
+    /// Polls a freshly-downloaded file until it exposes a **streaming** media
+    /// link — the same fast path the file browser plays — so cloud-playing a
+    /// Mikan save streams as smoothly as playing an already-complete file
+    /// (rather than the slow raw download link of a still-finalizing file). If
+    /// no streaming link appears within the timeout, falls back to any playable
+    /// URL so playback still starts.
+    public func waitForStreamablePlaybackURL(fileID: String, timeoutSeconds: Double = 90,
+                                             pollSeconds: Double = 2) async throws -> URL {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while true {
+            if let file = try? await fetchFile(fileID), let url = file.streamingURL {
+                playbackURLCache[fileID] = (url, Date())     // warm cache so a later click is instant
+                return url
+            }
+            if Date() >= deadline {
+                return try await playbackURL(fileID: fileID, allowCached: false)
             }
             try await Task.sleep(nanoseconds: UInt64(pollSeconds * 1_000_000_000))
         }
@@ -386,16 +436,23 @@ struct PPFile: Decodable {
                    modifiedTime: PPFile.date(from: modified_time))
     }
 
-    /// Prefer a streaming `medias` link (what PikPak's own player uses — it
-    /// starts faster than the raw download URL): origin first to keep original
-    /// quality, then the default rendition, then any. Falls back to
-    /// `web_content_link` when the file has no media renditions.
-    var bestPlaybackURL: URL? {
+    /// The streaming `medias` link PikPak's own player uses (it starts faster
+    /// and seeks better than the raw download URL): origin first to keep
+    /// original quality, then the default rendition, then any. Nil until the
+    /// file is complete enough to have renditions.
+    var streamingURL: URL? {
         let candidates = medias ?? []
         let pick = candidates.first(where: { $0.is_origin == true && $0.link?.url?.nonEmpty != nil })
             ?? candidates.first(where: { $0.is_default == true && $0.link?.url?.nonEmpty != nil })
             ?? candidates.first(where: { $0.link?.url?.nonEmpty != nil })
         if let s = pick?.link?.url?.nonEmpty, let url = URL(string: s) { return url }
+        return nil
+    }
+
+    /// A playable URL: the streaming link when available, else the raw
+    /// `web_content_link` (the only option for a still-finalizing file).
+    var bestPlaybackURL: URL? {
+        if let streaming = streamingURL { return streaming }
         if let link = web_content_link?.nonEmpty, let url = URL(string: link) { return url }
         return nil
     }
@@ -436,6 +493,12 @@ struct CreateFolderRequest: Encodable {
     let kind = "drive#folder"
     let parent_id: String
     let name: String
+}
+
+struct BatchMoveRequest: Encodable {
+    let ids: [String]
+    let to: To
+    struct To: Encodable { let parent_id: String }
 }
 
 struct CreateFolderResponse: Decodable {

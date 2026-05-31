@@ -135,8 +135,10 @@ public struct MikanView: View {
                 let task = try await PikPakDrive.shared.offlineDownload(url: torrent.url, name: torrent.name)
                 Self.logger.info("offline task added: \(task.id, privacy: .public)")
                 if play, !task.fileID.isEmpty {
-                    showToast("已添加，正在等待可播放…")
-                    let url = try await PikPakDrive.shared.waitForPlayableURL(fileID: task.fileID)
+                    showToast("已添加，正在 PikPak 缓存以便流畅播放…")
+                    // Wait for the streaming link (the same fast path the drive
+                    // browser plays) so cloud-play isn't the slow raw download URL.
+                    let url = try await PikPakDrive.shared.waitForStreamablePlaybackURL(fileID: task.fileID)
                     IinaBridgeRegistry.bridge?.openForPlayback(url, options: PlaybackOptions(
                         userAgent: PikPakConfig.web.userAgent, enlargeNetworkCache: true))
                     showToast("已在 IINA 中开始播放")
