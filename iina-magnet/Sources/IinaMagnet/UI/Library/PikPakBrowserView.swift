@@ -75,12 +75,26 @@ enum PikPakBrowsing {
 /// back into a folder is instant instead of re-fetching from PikPak (which also
 /// spares the rate limit). Refresh forces a re-fetch.
 final class PikPakListingCache {
+    private let maxFolders = 40
     private var byFolder: [String: [PikPakFile]] = [:]
+    private var order: [String] = []          // insertion order, oldest first
 
     func entries(for folderID: String) -> [PikPakFile]? { byFolder[folderID] }
-    func store(_ files: [PikPakFile], for folderID: String) { byFolder[folderID] = files }
-    func invalidate(_ folderID: String) { byFolder[folderID] = nil }
-    func invalidateAll() { byFolder.removeAll() }
+
+    func store(_ files: [PikPakFile], for folderID: String) {
+        if byFolder[folderID] == nil { order.append(folderID) }
+        byFolder[folderID] = files
+        while order.count > maxFolders {            // bound memory over a long session
+            byFolder[order.removeFirst()] = nil
+        }
+    }
+
+    func invalidate(_ folderID: String) {
+        byFolder[folderID] = nil
+        order.removeAll { $0 == folderID }
+    }
+
+    func invalidateAll() { byFolder.removeAll(); order.removeAll() }
 }
 
 struct PikPakBrowserView: View {

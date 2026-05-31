@@ -155,8 +155,16 @@ public actor PikPakDrive {
         guard let url = file.bestPlaybackURL else {
             throw PikPakError.api(code: -1, message: "该文件没有可播放的链接")
         }
-        playbackURLCache[fileID] = (url, Date())
+        cachePlaybackURL(url, for: fileID)
         return url
+    }
+
+    /// Stores a resolved URL, dropping entries past their TTL so the cache stays
+    /// bounded to recently-viewed files over a long session.
+    private func cachePlaybackURL(_ url: URL, for fileID: String) {
+        let now = Date()
+        playbackURLCache = playbackURLCache.filter { now.timeIntervalSince($0.value.fetchedAt) < playbackURLTTL }
+        playbackURLCache[fileID] = (url, now)
     }
 
     /// Best-effort warm of the playback-URL cache for a file (e.g. on row
@@ -257,7 +265,7 @@ public actor PikPakDrive {
         let deadline = Date().addingTimeInterval(timeoutSeconds)
         while true {
             if let file = try? await fetchFile(fileID), let url = file.streamingURL {
-                playbackURLCache[fileID] = (url, Date())     // warm cache so a later click is instant
+                cachePlaybackURL(url, for: fileID)           // warm cache so a later click is instant
                 return url
             }
             if Date() >= deadline {
