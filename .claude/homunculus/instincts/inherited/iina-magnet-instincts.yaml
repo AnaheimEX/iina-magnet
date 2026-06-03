@@ -1,0 +1,299 @@
+# Instincts generated from https://github.com/AnaheimEX/iina-magnet
+# Generated: 2026-06-03T15:48:24.937Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: iina-magnet-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Commit Length
+
+## Action
+
+Write moderate-length commit messages (~59 characters)
+
+## Evidence
+
+- Average commit message length: 59 chars
+- Based on 2 commits
+
+---
+id: iina-magnet-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: iina-magnet-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: iina-magnet-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: iina-magnet-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: iina-magnet-instinct-file-naming
+trigger: "When creating a new source file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct File Naming
+
+## Action
+
+Name the file using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.files: PascalCase
+
+---
+id: iina-magnet-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: iina-magnet-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: iina-magnet-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: iina-magnet-instinct-import-style
+trigger: "When importing modules in Swift files"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: iina-magnet-instinct-export-style
+trigger: "When exporting from a module"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: iina-magnet-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Test Location
+
+## Action
+
+Place test files in a separate directory from source files
+
+## Evidence
+
+- Pattern in architecture.testLocation: separate
+
+---
+id: iina-magnet-instinct-commit-prefix-ci
+trigger: "When making CI-related changes"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Commit Prefix Ci
+
+## Action
+
+Prefix the commit message with 'CI:'
+
+## Evidence
+
+- Commit example: 'CI: drop stale lib/libtorrent build and cache steps'
+- Pattern in commits.prefixes: 'ci'
+
+---
+id: iina-magnet-instinct-commit-format-mixed
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Commit Format Mixed
+
+## Action
+
+Allow both prefixed and non-prefixed commit messages, but use prefixes for CI changes
+
+## Evidence
+
+- Commit example: 'CI: drop stale lib/libtorrent build and cache steps'
+- Commit example: 'Fix library UI scaling, Mikan login persistence, and sidebar width'
+- Pattern in commits.type: mixed
+
+---
+id: iina-magnet-instinct-ci-config-location
+trigger: "When configuring CI workflows"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: AnaheimEX/iina-magnet
+---
+
+# Iina Magnet Instinct Ci Config Location
+
+## Action
+
+Place CI configuration files under .github/workflows/
+
+## Evidence
+
+- Pattern in architecture.configFiles: .github/workflows/iina-magnet-package.yml
+
