@@ -40,7 +40,14 @@ public struct MediaLibraryView: View {
     @State private var viewMode: LibraryViewMode = .grid
     @State private var sidebarOpen = true
     @State private var sidebarCompact = false
-    @State private var sidebarWidth: CGFloat = LibraryTokens.Spacing.sidebarWidth
+    /// Persisted across launches (AppStorage backs CGFloat through Double, the
+    /// type it natively supports) so a dragged sidebar width is remembered —
+    /// same pattern as PikPakBrowserView's persisted sort choice.
+    @AppStorage("library.sidebarWidth") private var sidebarWidthStored: Double
+        = Double(LibraryTokens.Spacing.sidebarWidth)
+    private var sidebarWidth: Binding<CGFloat> {
+        Binding(get: { CGFloat(sidebarWidthStored) }, set: { sidebarWidthStored = Double($0) })
+    }
 
     /// Resize bounds for the (expanded) sidebar; compact mode uses a fixed width.
     private static let sidebarMinWidth: CGFloat = 190
@@ -85,8 +92,8 @@ public struct MediaLibraryView: View {
                                    compact: sidebarCompact,
                                    onOpenPikPak: onOpenPikPak,
                                    onOpenMikan: onOpenMikan)
-                        .frame(width: sidebarCompact ? LibrarySidebar.compactWidth : sidebarWidth)
-                    ResizableDivider(width: $sidebarWidth,
+                        .frame(width: sidebarCompact ? LibrarySidebar.compactWidth : sidebarWidth.wrappedValue)
+                    ResizableDivider(width: sidebarWidth,
                                      range: Self.sidebarMinWidth...Self.sidebarMaxWidth,
                                      enabled: !sidebarCompact)
                 }

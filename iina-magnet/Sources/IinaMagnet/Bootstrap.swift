@@ -57,10 +57,13 @@ public enum IinaMagnetBootstrap {
         let screen = NSScreen.main?.visibleFrame.size ?? CGSize(width: 1440, height: 900)
         let width  = max(960, screen.width * 0.74)
         let height = max(640, screen.height * 0.82)
-        // Always enlarge (floor 1.5×), growing with screen width so elements are
-        // comfortably clickable; the UI lays out on a (window / scale) canvas and
-        // is scaled up to fill the window.
-        let scale  = min(max(screen.width / 1000, 1.5), 2.4)
+        // SwiftUI points are already DPI-independent — Retina pixel density is
+        // handled by the OS (backingScaleFactor), so the UI renders at its
+        // natural, comfortably-sized point metrics with no extra zoom. Keep a
+        // floor of 1.0 (never enlarge on normal displays) and only nudge up
+        // gently on very wide monitors so the layout isn't sparse; the cap keeps
+        // text crisp (scaleEffect softens it at higher factors).
+        let scale  = min(max(screen.width / 1512, 1.0), 1.3)
         WindowFactory.shared.open(.library, title: "媒体库",
                                   contentSize: CGSize(width: width, height: height)) {
             LibraryWindowView(scale: scale)
