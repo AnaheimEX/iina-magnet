@@ -211,46 +211,117 @@ final class MikanWebNavigator: ObservableObject {
 
 // MARK: - Web view
 
-private struct MikanWebView: NSViewRepresentable {
+/// Holds the single, persistent Mikan web view so the user's mikanani.me login
+/// (and the current page) survives leaving and re-entering the Mikan screen.
+/// The screen is shown/hidden by toggling a host `@State` (LibraryWindowView),
+/// which would otherwise destroy the web view on every exit and drop a
+/// just-completed login until the next reload — the bug where the page reads
+/// "not logged in" until you switch pages and come back. The default
+/// (persistent) website data store keeps the login cookies across launches too.
+@MainActor
+final class MikanWebViewStore: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    static let shared = MikanWebViewStore()
     static let messageName = "mikanTorrent"
 
+    let webView: WKWebView
+    /// Set by the live `MikanWebView` so captured links reach the current view.
+    var onCapture: ((_ name: String, _ url: String) -> Void)?
+    /// The current view's navigator, which publishes back/forward state.
+    weak var navigator: MikanWebNavigator?
+
+    private override init() {
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()   // persistent: login survives launches
+        let controller = WKUserContentController()
+        config.userContentController = controller
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.allowsBackForwardNavigationGestures = true     // trackpad swipe back/forward
+        self.webView = webView
+        super.init()
+        controller.add(self, name: Self.messageName)
+        controller.addUserScript(WKUserScript(source: MikanWebView.clickScript,
+                                              injectionTime: .atDocumentEnd,
+                                              forMainFrameOnly: false))
+        webView.navigationDelegate = self
+    }
+
+    /// Loads the home page only on first creation; later shows keep the current
+    /// (possibly logged-in) page instead of resetting to home.
+    func loadHomeIfNeeded() {
+        if webView.url == nil { webView.load(URLRequest(url: MikanWebNavigator.homeURL)) }
+    }
+
+    // Keep the back/forward button state in sync as pages load.
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { navigator?.sync(webView) }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { navigator?.sync(webView) }
+
+    // Primary path: the injected click listener posts {name, url}.
+    func userContentController(_ controller: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName,
+              let body = message.body as? [String: Any],
+              let url = (body["url"] as? String)?.trimmingCharacters(in: .whitespaces),
+              !url.isEmpty else { return }
+        onCapture?(MikanTitle.clean(body["name"] as? String ?? ""), url)
+    }
+
+    // Fallback: a plain navigation to a magnet / .torrent link (no JS).
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
+        if url.scheme == "magnet" {
+            decisionHandler(.cancel)
+            // Use the magnet's display name (real title) when present; else leave
+            // empty so PikPak names it from the torrent metadata.
+            onCapture?(Self.magnetName(url) ?? "", url.absoluteString)
+        } else if url.pathExtension.lowercased() == "torrent" {
+            decisionHandler(.cancel)
+            // A .torrent URL's filename is just the info-hash — not a usable title
+            // — so pass no name and let PikPak resolve the real one.
+            onCapture?("", url.absoluteString)
+        } else {
+            decisionHandler(.allow)
+        }
+    }
+
+    /// The `dn` (display name) parameter of a magnet URI, if present.
+    static func magnetName(_ url: URL) -> String? {
+        URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first { $0.name == "dn" }?.value?.removingPercentEncoding
+    }
+}
+
+private struct MikanWebView: NSViewRepresentable {
     var navigator: MikanWebNavigator
     var pageZoom: CGFloat
     var onCapture: (_ name: String, _ url: String) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(navigator: navigator, onCapture: onCapture) }
-
     func makeNSView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        let controller = WKUserContentController()
-        controller.add(context.coordinator, name: Self.messageName)
-        controller.addUserScript(WKUserScript(source: Self.clickScript,
-                                              injectionTime: .atDocumentEnd,
-                                              forMainFrameOnly: false))
-        config.userContentController = controller
-
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = context.coordinator
-        webView.allowsBackForwardNavigationGestures = true     // trackpad swipe back/forward
-        webView.pageZoom = pageZoom
-        navigator.webView = webView
-        webView.load(URLRequest(url: MikanWebNavigator.homeURL))
-        return webView
+        let store = MikanWebViewStore.shared
+        store.navigator = navigator
+        store.onCapture = onCapture
+        navigator.webView = store.webView
+        store.webView.pageZoom = pageZoom
+        store.loadHomeIfNeeded()
+        navigator.sync(store.webView)   // reflect the persisted page's nav state
+        return store.webView
     }
 
     func updateNSView(_ nsView: WKWebView, context: Context) {
+        let store = MikanWebViewStore.shared
+        store.navigator = navigator
+        store.onCapture = onCapture
         if abs(nsView.pageZoom - pageZoom) > 0.01 { nsView.pageZoom = pageZoom }
     }
 
-    static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
-        nsView.configuration.userContentController.removeScriptMessageHandler(forName: messageName)
-    }
+    // No dismantleNSView: the store owns the web view across show/hide, so the
+    // login session and current page persist instead of being torn down.
 
     /// Intercepts clicks on magnet / .torrent links — including Mikan's
     /// `data-clipboard-text` magnet buttons, which aren't hrefs so navigation
     /// interception alone would miss them — and reports the link plus the
     /// episode title read from the surrounding table row.
-    private static let clickScript = """
+    fileprivate static let clickScript = """
     (function() {
       function titleFor(el) {
         // Mikan's rows aren't a <table>: the release title is an
@@ -282,59 +353,4 @@ private struct MikanWebView: NSViewRepresentable {
       }, true);
     })();
     """
-
-    @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        private let navigator: MikanWebNavigator
-        private let onCapture: (_ name: String, _ url: String) -> Void
-        init(navigator: MikanWebNavigator,
-             onCapture: @escaping (_ name: String, _ url: String) -> Void) {
-            self.navigator = navigator
-            self.onCapture = onCapture
-        }
-
-        // Keep the back/forward button state in sync as pages load.
-        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-            navigator.sync(webView)
-        }
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            navigator.sync(webView)
-        }
-
-        // Primary path: the injected click listener posts {name, url}.
-        func userContentController(_ controller: WKUserContentController,
-                                   didReceive message: WKScriptMessage) {
-            guard message.name == MikanWebView.messageName,
-                  let body = message.body as? [String: Any],
-                  let url = (body["url"] as? String)?.trimmingCharacters(in: .whitespaces),
-                  !url.isEmpty else { return }
-            let name = MikanTitle.clean(body["name"] as? String ?? "")
-            onCapture(name, url)
-        }
-
-        // Fallback: a plain navigation to a magnet / .torrent link (no JS).
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
-            if url.scheme == "magnet" {
-                decisionHandler(.cancel)
-                // Use the magnet's display name (real title) when present; else
-                // leave empty so PikPak names it from the torrent metadata.
-                onCapture(Self.magnetName(url) ?? "", url.absoluteString)
-            } else if url.pathExtension.lowercased() == "torrent" {
-                decisionHandler(.cancel)
-                // A .torrent URL's filename is just the info-hash — not a usable
-                // title — so pass no name and let PikPak resolve the real one.
-                onCapture("", url.absoluteString)
-            } else {
-                decisionHandler(.allow)
-            }
-        }
-
-        /// The `dn` (display name) parameter of a magnet URI, if present.
-        static func magnetName(_ url: URL) -> String? {
-            URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first { $0.name == "dn" }?.value?.removingPercentEncoding
-        }
-    }
 }
