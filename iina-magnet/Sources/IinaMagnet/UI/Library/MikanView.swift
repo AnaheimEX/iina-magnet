@@ -21,6 +21,7 @@ public struct MikanView: View {
     /// then magnified by the library window's uniform scale).
     private let pageZoom: CGFloat
 
+    @AppStorage("mikanUserZoom") private var userZoom: Double = 1.25
     @State private var pending: Torrent?
     @State private var busy = false
     @State private var toast: String?
@@ -41,7 +42,7 @@ public struct MikanView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(LibraryTokens.sep)
-            MikanWebView(navigator: navigator, pageZoom: pageZoom) { name, url in
+            MikanWebView(navigator: navigator, pageZoom: pageZoom * CGFloat(userZoom)) { name, url in
                 pending = Torrent(name: name, url: url)
             }
         }
@@ -62,6 +63,8 @@ public struct MikanView: View {
                     .foregroundStyle(LibraryTokens.text)
             }
             navButtons
+            Divider().frame(height: 14).padding(.horizontal, 4)
+            zoomControls
             Spacer()
             Text("点击磁力 / 种子可保存到 PikPak").font(.system(size: 11))
                 .foregroundStyle(LibraryTokens.text3)
@@ -79,6 +82,20 @@ public struct MikanView: View {
             navButton("house", help: "蜜柑首页") { navigator.goHome() }
         }
         .padding(.leading, 6)
+    }
+
+    private var zoomControls: some View {
+        HStack(spacing: 8) {
+            navButton("minus.magnifyingglass", help: "缩小网页") { userZoom = max(userZoom - 0.1, 0.5) }
+            Text("\(Int(userZoom * 100))%")
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundStyle(LibraryTokens.text2)
+                .frame(width: 36, alignment: .center)
+                .contentShape(Rectangle())
+                .onTapGesture { userZoom = 1.0 }
+                .help("恢复默认自适应大小")
+            navButton("plus.magnifyingglass", help: "放大网页") { userZoom = min(userZoom + 0.1, 3.0) }
+        }
     }
 
     private func navButton(_ icon: String, help: String, enabled: Bool = true,
@@ -236,6 +253,7 @@ final class MikanWebViewStore: NSObject, WKNavigationDelegate, WKScriptMessageHa
         config.userContentController = controller
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true     // trackpad swipe back/forward
+        webView.allowsMagnification = true                     // trackpad pinch to zoom
         self.webView = webView
         super.init()
         controller.add(self, name: Self.messageName)

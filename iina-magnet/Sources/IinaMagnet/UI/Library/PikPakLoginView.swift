@@ -118,7 +118,7 @@ struct PikPakLoginWebView: NSViewRepresentable {
         private func scheduleFallback(_ json: String) {
             guard !fallbackScheduled else { return }
             fallbackScheduled = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 guard let self, !self.captured,
                       let base = PikPakWebCredentialParser.parse(localStorageJSON: self.lastLocalStorage ?? json)
                 else { return }

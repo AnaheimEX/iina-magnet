@@ -66,7 +66,7 @@ public actor PikPakAuth {
             deviceID: device,
             expiresAt: Date().addingTimeInterval(TimeInterval(token.expires_in ?? 7200)))
         session = newSession
-        store.save(newSession)
+        Task.detached { [store] in store.save(newSession) }
         Self.logger.info("signed in (sub=\(newSession.userID, privacy: .private(mask: .hash)))")
     }
 
@@ -84,7 +84,7 @@ public actor PikPakAuth {
             deviceID: device,
             expiresAt: Date().addingTimeInterval(TimeInterval(web.expiresIn ?? 7200)))
         session = newSession
-        store.save(newSession)
+        Task.detached { [store] in store.save(newSession) }
         Self.logger.info("adopted web session (sub=\(newSession.userID, privacy: .private(mask: .hash)))")
     }
 
@@ -129,7 +129,7 @@ public actor PikPakAuth {
         if let sub = token.sub, !sub.isEmpty { updated.userID = sub }
         updated.expiresAt = Date().addingTimeInterval(TimeInterval(token.expires_in ?? 7200))
         session = updated
-        store.save(updated)
+        Task.detached { [store] in store.save(updated) }
         return updated.accessToken
     }
 
@@ -179,7 +179,7 @@ public actor PikPakAuth {
            var current = session, current.deviceID != device {
             current.deviceID = device
             session = current
-            store.save(current)
+            Task.detached { [store] in store.save(current) }
         }
         return result.token
     }

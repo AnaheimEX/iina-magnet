@@ -65,8 +65,10 @@ public struct KeychainPikPakTokenStore: PikPakTokenStore {
         SecItemDelete(baseQuery as CFDictionary)
         var add = baseQuery
         add[kSecValueData as String] = data
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(add as CFDictionary, nil)
+        let status = SecItemAdd(add as CFDictionary, nil)
+        if status != errSecSuccess {
+            print("PikPakTokenStore failed to save to Keychain: \(status)")
+        }
     }
 
     public func clear() {
