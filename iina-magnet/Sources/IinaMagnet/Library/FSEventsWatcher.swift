@@ -70,6 +70,9 @@ public final class FSEventsWatcher: @unchecked Sendable {
             { _, info, count, paths, _, _ in
                 guard let info else { return }
                 let watcher = Unmanaged<FSEventsWatcher>.fromOpaque(info).takeUnretainedValue()
+                // FSEvents passes eventPaths as a void* that actually points to a
+                // CFArray of CFString; unsafeBitCast is required to recover it
+                // (the API erases the type). compactMap guards non-string entries.
                 let cfPaths = unsafeBitCast(paths, to: NSArray.self)
                 watcher.handleBatch(cfPaths.compactMap { $0 as? String })
             },

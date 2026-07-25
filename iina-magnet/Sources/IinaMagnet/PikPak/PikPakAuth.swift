@@ -104,6 +104,11 @@ public actor PikPakAuth {
     }
 
     public func signOut() {
+        // Cancel any in-flight refresh so it cannot revive the session we are
+        // tearing down: performRefresh captures the old session and would
+        // store.save() a fresh one after we cleared it.
+        refreshTask?.cancel()
+        refreshTask = nil
         session = nil
         driveCaptchaToken = ""
         store.clear()
@@ -242,9 +247,12 @@ public actor PikPakAuth {
         let (data, status) = try await post(config.tokenURL, body: request,
                                             headers: ["User-Agent": config.userAgent])
         if let error = decodeError(data, status: status) {
-            // A dead refresh token reads as not-authenticated so the UI prompts
-            // a fresh login rather than showing a raw API error.
-            if case .api = error {
+            // Only a genuinely dead refresh token wipes the session. Transient
+            // API errors (e.g. 5xx with a body) must keep it so a retry can
+            // still succeed instead of forcing a fresh login.
+            if case .api(let code, let message) = error,
+               code == 4126 || code == 4121
+               || message.lowercased().contains("invalid_grant") {
                 session = nil
                 store.clear()
                 notifySessionDidChange()
