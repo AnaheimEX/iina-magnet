@@ -59,6 +59,10 @@ public actor PikPakAuth {
 
     /// Logs in with the user's own PikPak account and persists the session.
     public func signIn(username: String, password: String) async throws {
+        // Cancel any in-flight refresh so a stale rotation cannot overwrite
+        // this fresh session (symmetric with signOut).
+        refreshTask?.cancel()
+        refreshTask = nil
         guard !username.isEmpty, !password.isEmpty else { throw PikPakError.missingCredentials }
         let device = stableDeviceID()
         let captcha = try await fetchCaptchaToken(username: username, deviceID: device)
@@ -79,6 +83,10 @@ public actor PikPakAuth {
     /// Adopts tokens captured from a web-view login (the primary login path —
     /// PikPak's page handles captcha / 2FA, we keep the resulting session).
     public func adopt(_ web: PikPakWebCredentials) {
+        // Cancel any in-flight refresh so a stale rotation cannot overwrite
+        // this fresh session (symmetric with signOut).
+        refreshTask?.cancel()
+        refreshTask = nil
         let device = web.deviceID ?? stableDeviceID()
         // Reuse the captcha token PikPak's own page already minted, so drive
         // calls don't need a self-computed (salt-dependent) captcha_sign.
@@ -136,6 +144,15 @@ public actor PikPakAuth {
     private func performRefresh() async throws -> String {
         guard let current = session else { throw PikPakError.notAuthenticated }
         let token = try await postRefresh(refreshToken: current.refreshToken)
+        // signOut/adopt/signIn may have cancelled this task or swapped the
+        // session during the await. Bail before overwriting/persisting: Swift
+        // cancellation is cooperative (cancel only sets a flag), so without
+        // this guard a stale refresh revives a torn-down session or clobbers
+        // a fresh login.
+        try Task.checkCancellation()
+        guard session?.refreshToken == current.refreshToken else {
+            throw CancellationError()
+        }
         var updated = current
         updated.accessToken = token.access_token
         updated.refreshToken = token.refresh_token
