@@ -18,6 +18,11 @@ import OSLog
 public actor PikPakAuth {
     private static let logger = Logger(subsystem: "iina-magnet", category: "pikpak-auth")
 
+    /// UI surfaces observe this so a rejected/expired persisted session cannot
+    /// leave the drive browser visible after the actor has cleared its state.
+    public static let sessionDidChangeNotification =
+        Notification.Name("iina-magnet.pikpak-session-did-change")
+
     /// App-wide session, shared by the login UI and (later) the file API.
     public static let shared = PikPakAuth()
 
@@ -66,7 +71,8 @@ public actor PikPakAuth {
             deviceID: device,
             expiresAt: Date().addingTimeInterval(TimeInterval(token.expires_in ?? 7200)))
         session = newSession
-        Task.detached { [store] in store.save(newSession) }
+        store.save(newSession)
+        notifySessionDidChange()
         Self.logger.info("signed in (sub=\(newSession.userID, privacy: .private(mask: .hash)))")
     }
 
@@ -84,7 +90,8 @@ public actor PikPakAuth {
             deviceID: device,
             expiresAt: Date().addingTimeInterval(TimeInterval(web.expiresIn ?? 7200)))
         session = newSession
-        Task.detached { [store] in store.save(newSession) }
+        store.save(newSession)
+        notifySessionDidChange()
         Self.logger.info("adopted web session (sub=\(newSession.userID, privacy: .private(mask: .hash)))")
     }
 
@@ -100,6 +107,7 @@ public actor PikPakAuth {
         session = nil
         driveCaptchaToken = ""
         store.clear()
+        notifySessionDidChange()
     }
 
     // MARK: - For the drive API
@@ -129,7 +137,8 @@ public actor PikPakAuth {
         if let sub = token.sub, !sub.isEmpty { updated.userID = sub }
         updated.expiresAt = Date().addingTimeInterval(TimeInterval(token.expires_in ?? 7200))
         session = updated
-        Task.detached { [store] in store.save(updated) }
+        store.save(updated)
+        notifySessionDidChange()
         return updated.accessToken
     }
 
@@ -179,7 +188,8 @@ public actor PikPakAuth {
            var current = session, current.deviceID != device {
             current.deviceID = device
             session = current
-            Task.detached { [store] in store.save(current) }
+            store.save(current)
+            notifySessionDidChange()
         }
         return result.token
     }
@@ -234,7 +244,12 @@ public actor PikPakAuth {
         if let error = decodeError(data, status: status) {
             // A dead refresh token reads as not-authenticated so the UI prompts
             // a fresh login rather than showing a raw API error.
-            if case .api = error { session = nil; store.clear(); throw PikPakError.notAuthenticated }
+            if case .api = error {
+                session = nil
+                store.clear()
+                notifySessionDidChange()
+                throw PikPakError.notAuthenticated
+            }
             throw error
         }
         return try decode(TokenResponse.self, from: data)
@@ -247,6 +262,10 @@ public actor PikPakAuth {
         if (11...18).contains(username.count),
            username.allSatisfy({ $0.isNumber || $0 == "+" }) { return ["phone_number": username] }
         return ["username": username]
+    }
+
+    private func notifySessionDidChange() {
+        NotificationCenter.default.post(name: Self.sessionDidChangeNotification, object: nil)
     }
 
     /// The session's device id, else a freshly minted one. Web login supplies
