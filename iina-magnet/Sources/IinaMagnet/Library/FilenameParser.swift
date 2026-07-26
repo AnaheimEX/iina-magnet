@@ -49,6 +49,12 @@ public enum FilenameParser {
                                                                options: .caseInsensitive)
 
     public static func parse(_ filename: String) -> ParsedMedia {
+        // Guard against empty/whitespace input so it can never produce a blank
+        // title card in the library.
+        let trimmed = filename.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ParsedMedia(title: "未知文件", kindHint: .unknown)
+        }
         let ant = ANTParser.parse(filename) ?? [:]
 
         let group      = ant["release_group"].flatMap(nonEmpty)
