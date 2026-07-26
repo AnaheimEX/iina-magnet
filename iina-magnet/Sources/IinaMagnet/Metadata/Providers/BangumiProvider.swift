@@ -51,17 +51,16 @@ public struct BangumiProvider: MetadataProvider {
         }
         let subject = try JSONDecoder().decode(Subject.self, from: try await client.getJSON(subjectURL))
 
+        // Paginate episodes: Bangumi caps /v0/episodes at 100/page. Without
+        // offset pagination long runners (One Piece, Conan) silently lose
+        // episodes past the first page.
         var episodes: [MetadataEpisode] = []
-        if let epURL = URL(string: "\(host)/v0/episodes?subject_id=\(externalId)&type=0&limit=100"),
-           let epData = try? await client.getJSON(epURL),
-           let epResp = try? JSONDecoder().decode(EpisodeResponse.self, from: epData) {
-            episodes = epResp.data.map { e in
-                MetadataEpisode(number: Int(e.sort ?? Double(e.ep ?? 0)) ,
-                                title: e.name_cn?.nonEmpty ?? e.name?.nonEmpty,
-                                titleOriginal: e.name?.nonEmpty,
-                                overview: nil,
-                                airDate: date(from: e.airdate))
-            }
+        do {
+            episodes = try await fetchAllEpisodes(subjectId: externalId)
+        } catch {
+            // Episodes are best-effort metadata; a transient failure must not
+            // fail the whole details call — caller gets the subject minus its
+            // episode list.
         }
 
         let (genres, countries) = Self.classifyTags(subject.meta_tags ?? [])
@@ -91,6 +90,30 @@ public struct BangumiProvider: MetadataProvider {
                                countries: countries,
                                cast: cast,
                                episodes: episodes)
+    }
+
+    /// Fetches every episode with offset pagination. Bangumi's /v0/episodes
+    /// caps at `limit` per request (max 100); pages until a short page arrives.
+    private func fetchAllEpisodes(subjectId: String, limit: Int = 100) async throws -> [MetadataEpisode] {
+        var result: [MetadataEpisode] = []
+        var offset = 0
+        let maxPages = 50   // 5000-episode safety cap, beyond any real title
+        for _ in 0..<maxPages {
+            guard let url = URL(string: "\(host)/v0/episodes?subject_id=\(subjectId)&type=0&limit=\(limit)&offset=\(offset)") else { break }
+            let data = try await client.getJSON(url)
+            let resp = try JSONDecoder().decode(EpisodeResponse.self, from: data)
+            let page = resp.data.map { e in
+                MetadataEpisode(number: Int(e.sort ?? Double(e.ep ?? 0)),
+                                title: e.name_cn?.nonEmpty ?? e.name?.nonEmpty,
+                                titleOriginal: e.name?.nonEmpty,
+                                overview: nil,
+                                airDate: date(from: e.airdate))
+            }
+            result.append(contentsOf: page)
+            if page.count < limit { break }   // last page
+            offset += limit
+        }
+        return result
     }
 
     // MARK: - meta_tags classification

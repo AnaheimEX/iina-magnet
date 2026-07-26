@@ -264,12 +264,20 @@ public actor PikPakAuth {
         let (data, status) = try await post(config.tokenURL, body: request,
                                             headers: ["User-Agent": config.userAgent])
         if let error = decodeError(data, status: status) {
-            // Only a genuinely dead refresh token wipes the session. Transient
-            // API errors (e.g. 5xx with a body) must keep it so a retry can
-            // still succeed instead of forcing a fresh login.
-            if case .api(let code, let message) = error,
-               code == 4126 || code == 4121
-               || message.lowercased().contains("invalid_grant") {
+            // Only a genuinely dead refresh token / auth denial wipes the
+            // session. Transient API errors (e.g. 5xx with a body) must keep
+            // it so a retry can still succeed instead of forcing a fresh login.
+            let deadToken: Bool
+            switch error {
+            case .api(let code, let message):
+                deadToken = code == 4126 || code == 4121
+                    || message.lowercased().contains("invalid_grant")
+            case .http(let status):
+                deadToken = status == 401 || status == 403
+            default:
+                deadToken = false
+            }
+            if deadToken {
                 session = nil
                 store.clear()
                 notifySessionDidChange()
