@@ -378,14 +378,14 @@ public actor PikPakDrive {
             case 9:                                          // captcha token expired
                 guard !triedCaptcha else { throw apiError(in: data, status: status, code: code) }
                 triedCaptcha = true
-                // 1) Try a cheap self-signed token. 2) If that's rejected (the
-                // salts in PikPakConfig have rotated), silently re-capture a
-                // valid one from the web client offscreen. 3) Only if that also
-                // fails do we ask the user to log in again.
+                // Self-sign a fresh captcha token. If that fails the salts in
+                // PikPakConfig have rotated — the offscreen recapturer exists
+                // but is currently inert (its WKWebView uses a different cookie
+                // store than the non-persistent login sheet, so it can't see
+                // the logged-in SPA), so prompt a re-login instead of waiting
+                // 15s for a capture that can't succeed.
                 if let signed = try? await auth.captchaToken(forAction: action, refresh: true) {
                     captcha = signed
-                } else if let recaptured = try? await auth.recaptureCaptchaToken() {
-                    captcha = recaptured
                 } else {
                     throw PikPakError.captchaRequired("PikPak 验证已过期，请重新登录 PikPak。")
                 }

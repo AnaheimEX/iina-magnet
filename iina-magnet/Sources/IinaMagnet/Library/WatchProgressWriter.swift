@@ -94,8 +94,15 @@ public struct WatchProgressWriter {
     /// stored URL. Keyed on (title, season, episode), so any version of an episode
     /// resolves to the same progress row.
     private func versionFile(for url: URL) throws -> VersionFile? {
-        let target = Self.canonicalPath(url)
         let all = try context.fetch(FetchDescriptor<VersionFile>())
+        // Fast path: most plays open the exact stored path (no symlink), so a
+        // plain string compare avoids a resolvingSymlinksInPath stat per row.
+        let rawPath = url.path
+        if let exact = all.first(where: { $0.fileURL.path == rawPath }) {
+            return exact
+        }
+        // Fallback: a symlinked / non-canonical play path resolves both sides.
+        let target = Self.canonicalPath(url)
         return all.first { Self.canonicalPath($0.fileURL) == target }
     }
 
