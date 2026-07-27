@@ -112,11 +112,16 @@ browser/Firefox_Open_In_IINA/*
 /.vscode
 
 deps/executable/youtube-dl
-deps/plugins
+deps/plugins/*
+!deps/plugins/anime4k.iinaplgz
+!deps/plugins/anime4k.catalog.json
+!deps/plugins/anime4k.trusted-catalogs.json
 
 # iina-magnet fork additions
 .omc/
+.omx/
+__pycache__/
+*.py[cod]
 iina-magnet/.build/
 iina-magnet/.swiftpm/
 iina-magnet/Package.resolved
-

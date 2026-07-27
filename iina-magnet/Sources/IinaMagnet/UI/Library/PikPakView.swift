@@ -8,6 +8,7 @@
 //  play wiring lands in the next unit — for now the signed-in state shows a
 //  placeholder.
 
+import Foundation
 import SwiftUI
 
 public struct PikPakView: View {
@@ -34,14 +35,19 @@ public struct PikPakView: View {
         }
         .background(LibraryTokens.bg)
         .task { await refreshState() }
+        .onReceive(NotificationCenter.default.publisher(
+            for: PikPakAuth.sessionDidChangeNotification
+        )) { _ in
+            Task { await refreshState() }
+        }
         .sheet(isPresented: $showLogin) {
             PikPakLoginSheet(
                 onCancel: { showLogin = false },
                 onCapture: { cred in
-                    showLogin = false
                     Task {
                         await PikPakAuth.shared.adopt(cred)
                         await refreshState()
+                        if signedIn { showLogin = false }
                     }
                 })
         }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A4B000000000000000000001 /* BundledPluginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F000000000000000000001 /* BundledPluginManager.swift */; };
 		1326717E20852D0D000FA7E2 /* SubChooseViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 1326718020852D0D000FA7E2 /* SubChooseViewController.xib */; };
 		216D04A1C540A07D7760E5AC /* IinaMagnetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3F191BFDC3FDCF810F8610 /* IinaMagnetBridge.swift */; };
 		3412DB8E2C2FC64C00BBC142 /* Equalizations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3412DB8D2C2FC64800BBC142 /* Equalizations.swift */; };
@@ -619,6 +620,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A4F000000000000000000001 /* BundledPluginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledPluginManager.swift; sourceTree = "<group>"; };
 		0507C25E2B5617650043AD05 /* he */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = he; path = he.lproj/MainMenu.strings; sourceTree = "<group>"; };
 		0507C25F2B5617660043AD05 /* he */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = he; path = he.lproj/MainWindowController.strings; sourceTree = "<group>"; };
 		0507C2602B5617660043AD05 /* he */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = he; path = he.lproj/QuickSettingViewController.strings; sourceTree = "<group>"; };
@@ -2896,6 +2898,7 @@
 			children = (
 				E35306F22147F770008FE492 /* API */,
 				E35306EE2147A8CE008FE492 /* JavascriptPlugin.swift */,
+				A4F000000000000000000001 /* BundledPluginManager.swift */,
 				E35306FB214813B7008FE492 /* JavascriptPluginInstance.swift */,
 				E32B157E21BE219700CDBCEA /* JavascriptPluginMenuItem.swift */,
 				E337D5E12411B64900B5729A /* JavascriptPolyfill.swift */,
@@ -3223,17 +3226,19 @@
 			files = (
 			);
 			inputFileListPaths = (
+				"$(SRCROOT)/Configs/Anime4KPluginInputs.xcfilelist",
 			);
 			inputPaths = (
 			);
 			name = "Copy Default Plugins";
 			outputFileListPaths = (
+				"$(SRCROOT)/Configs/Anime4KPluginOutputs.xcfilelist",
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "#!/bin/bash\n\nset -x\n\nSOURCE_DIR=\"${SRCROOT}/deps/plugins/\"\nDEST_DIR=\"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/plugins\"\n\nif [ -d \"$SOURCE_DIR\" ]; then\n  mkdir -p \"$DEST_DIR\"\n  find \"$SOURCE_DIR\" -name \"*.iinaplgz\" -type f -exec cp {} \"$DEST_DIR/\" \\;\n  echo \"Copied default plugins\"\nelse\n  echo \"Default plugins not found\"\nfi\n";
+			shellScript = "#!/bin/bash\n\nset -euo pipefail\nset -x\n\nSOURCE_DIR=\"${SRCROOT}/deps/plugins\"\nDEST_DIR=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/plugins\"\nARCHIVE=\"${SOURCE_DIR}/anime4k.iinaplgz\"\nCATALOG=\"${SOURCE_DIR}/anime4k.catalog.json\"\nTRUST_HISTORY=\"${SOURCE_DIR}/anime4k.trusted-catalogs.json\"\n\nPYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 \"${SRCROOT}/scripts/build-anime4k-plugin.py\" --check\nmkdir -p \"${DEST_DIR}\"\nwhile IFS= read -r -d '' plugin; do\n  cp -f \"${plugin}\" \"${DEST_DIR}/\"\ndone < <(find \"${SOURCE_DIR}\" -name \"*.iinaplgz\" -type f -print0)\ncp -f \"${CATALOG}\" \"${DEST_DIR}/anime4k.catalog.json\"\ncp -f \"${TRUST_HISTORY}\" \"${DEST_DIR}/anime4k.trusted-catalogs.json\"\ncmp \"${ARCHIVE}\" \"${DEST_DIR}/anime4k.iinaplgz\"\ncmp \"${CATALOG}\" \"${DEST_DIR}/anime4k.catalog.json\"\ncmp \"${TRUST_HISTORY}\" \"${DEST_DIR}/anime4k.trusted-catalogs.json\"\necho \"Verified and copied default plugins\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -3250,6 +3255,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A4B000000000000000000001 /* BundledPluginManager.swift in Sources */,
 				E3EC8C432F94330400FBB51E /* Dialog.swift in Sources */,
 				E35306FA214808AB008FE492 /* JavascriptAPIEvent.swift in Sources */,
 				849581F11F02728700D3B359 /* InitialWindowController.swift in Sources */,

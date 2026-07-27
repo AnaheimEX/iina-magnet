@@ -18,6 +18,9 @@ class JavascriptPluginInstance {
 
   weak var player: PlayerCore!
   weak var plugin: JavascriptPlugin!
+  /// Stable across static plugin-inventory replacement. Menu items may retain
+  /// an instance after its weak plugin descriptor has been retired.
+  let identifier: String
   let isGlobal: Bool
 
   lazy var overlayView: PluginOverlayView = {
@@ -53,8 +56,10 @@ class JavascriptPluginInstance {
     currentFileStack.last
   }
   private var currentFileStack: [URL] = []
+  private var preparedForUnload = false
 
   init(player: PlayerCore?, plugin: JavascriptPlugin) {
+    identifier = plugin.identifier
     self.plugin = plugin
 
     if let player = player {
@@ -73,8 +78,21 @@ class JavascriptPluginInstance {
     if let plugin = self.plugin {
       Logger.log("Unload \(plugin.name)", level: .debug, subsystem: subsystem)
     }
-    polyfill.removeAllTimers()
-    apis.values.forEach { $0.cleanUp(self) }
+    prepareForUnload()
+    polyfill?.removeAllTimers()
+    apis?.values.forEach { $0.cleanUp(self) }
+  }
+
+  /// Gives plugin code one synchronous chance to release player-owned state
+  /// while APIs (especially mpv) are still available. Returned promises are
+  /// deliberately ignored because host teardown cannot wait asynchronously.
+  func prepareForUnload() {
+    guard !preparedForUnload else { return }
+    preparedForUnload = true
+
+    guard js.evaluateScript("typeof iinaPluginWillUnload === 'function'")?.toBool() == true,
+          let hook = js.objectForKeyedSubscript("iinaPluginWillUnload") else { return }
+    _ = hook.call(withArguments: [])
   }
 
   func canAccess(url: URL) -> Bool {

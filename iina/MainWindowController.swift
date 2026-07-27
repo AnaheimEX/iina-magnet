@@ -50,6 +50,8 @@ fileprivate let minimumInitialDragDistance: CGFloat = 3.0
 
 class MainWindowController: PlayerWindowController {
 
+  private static let lastWindowFrameKey = "MainWindowLastPosition"
+
   override var windowNibName: NSNib.Name {
     return NSNib.Name("MainWindowController")
   }
@@ -1335,7 +1337,8 @@ class MainWindowController: PlayerWindowController {
     guard let w = self.window, let cv = w.contentView else { return }
     cv.trackingAreas.forEach(cv.removeTrackingArea)
     playSlider.trackingAreas.forEach(playSlider.removeTrackingArea)
-    UserDefaults.standard.set(NSStringFromRect(window!.frame), forKey: "MainWindowLastPosition")
+    let windowedFrame = fsState.priorWindowedFrame ?? w.frame
+    UserDefaults.standard.set(NSStringFromRect(windowedFrame), forKey: Self.lastWindowFrameKey)
     
     player.events.emit(.windowWillClose)
   }
@@ -2681,7 +2684,7 @@ class MainWindowController: PlayerWindowController {
       NSScreen.log("Window is currently showing screen", currentScreen)
       return currentScreen
     }
-    guard let rectString = UserDefaults.standard.value(forKey: "MainWindowLastPosition") as? String else {
+    guard let rectString = UserDefaults.standard.value(forKey: Self.lastWindowFrameKey) as? String else {
       let selected = window.selectDefaultScreen()
       NSScreen.log("MainWindowLastPosition not found, using default screen", selected)
       return selected
@@ -2698,6 +2701,18 @@ class MainWindowController: PlayerWindowController {
     // Found a screen containing the previous window origin. Use that screen for the window.
     NSScreen.log("MainWindowLastPosition \(rect.origin) matched", lastScreen)
     return lastScreen
+  }
+
+  /// Returns the last user-sized player frame, constrained to the selected
+  /// screen so reconnecting with a different display layout cannot strand the
+  /// window off-screen. Explicit mpv geometry remains higher priority.
+  private func savedWindowFrame(constrainedTo screenRect: NSRect) -> NSRect? {
+    guard let value = UserDefaults.standard.string(forKey: Self.lastWindowFrameKey) else { return nil }
+    let rect = NSRectFromString(value)
+    guard rect.width.isFinite, rect.height.isFinite,
+          rect.origin.x.isFinite, rect.origin.y.isFinite,
+          rect.width > 0, rect.height > 0 else { return nil }
+    return rect.constrain(in: screenRect)
   }
 
   /** Set window size when info available, or video size changed. */
@@ -2721,6 +2736,7 @@ class MainWindowController: PlayerWindowController {
 
     let frame = fsState.priorWindowedFrame ?? window.frame
 
+    let resizeTiming = Preference.enum(for: .resizeWindowTiming) as Preference.ResizeWindowTiming
     if player.info.justStartedFile {
       // Many settings can require the window to be resized/repositioned:
       // - Initial window size
@@ -2728,7 +2744,6 @@ class MainWindowController: PlayerWindowController {
       // - Resize the window to fit video size
       // - Use physical resolution on Retina displays
       // - Direct use of the mpv geometry option
-      let resizeTiming = Preference.enum(for: .resizeWindowTiming) as Preference.ResizeWindowTiming
       switch resizeTiming {
       case .always:
         needResizeWindow = true
@@ -2742,7 +2757,18 @@ class MainWindowController: PlayerWindowController {
       needResizeWindow = true
     }
 
-    if needResizeWindow {
+    let restoredWindowFrame: NSRect? = {
+      guard player.info.justStartedFile,
+            shouldApplyInitialWindowSize,
+            resizeTiming == .never,
+            windowFrameFromGeometry() == nil else { return nil }
+      return savedWindowFrame(constrainedTo: screenRect)
+    }()
+
+    if let restoredWindowFrame {
+      rect = restoredWindowFrame
+      log("Restored last user-sized window frame: \(rect)")
+    } else if needResizeWindow {
       log("Need to resize window")
       // get videoSize on screen
       var videoSize = originalVideoSize

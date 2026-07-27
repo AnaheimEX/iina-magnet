@@ -26,6 +26,7 @@ public struct LibraryWindowView: View {
     @State private var scan: ScanState?
     @State private var didScan = false                       // a scan has completed this session
     @State private var folderStore = LibraryFolderStore.shared
+    @State private var pendingRemoval: PersistentIdentifier?
 
     public init(scale: CGFloat = 1) { self.scale = scale }
 
@@ -71,6 +72,18 @@ public struct LibraryWindowView: View {
                     .scaleEffect(scale, anchor: .topLeading)
             }
         }
+        .confirmationDialog(
+            "从媒体库移除？",
+            isPresented: Binding(
+                get: { pendingRemoval != nil },
+                set: { if !$0 { pendingRemoval = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("从媒体库移除", role: .destructive, action: removePendingTitle)
+            Button("取消", role: .cancel) { pendingRemoval = nil }
+        } message: {
+            Text("只会移除媒体库记录，不会删除磁盘上的源文件。文件仍在扫描目录时，下次扫描可能重新添加。")
+        }
     }
 
     /// Web-page zoom for Mikan, derived from the display-adaptive `scale` but
@@ -82,6 +95,7 @@ public struct LibraryWindowView: View {
         Group {
             if let id = route, let title = titles.first(where: { $0.persistentModelID == id }) {
                 ArchiveScreen(title: title, onBack: { route = nil },
+                              onRemove: { pendingRemoval = title.persistentModelID },
                               onMergedAway: { route = $0 })
             } else if showPending {
                 PendingConfirmationView(
@@ -95,6 +109,7 @@ public struct LibraryWindowView: View {
                 MediaLibraryView(items: items,
                                  displayState: displayState,
                                  onOpen: { route = $0 },
+                                 onRemove: { pendingRemoval = $0 },
                                  onScan: startScan,
                                  onCancelScan: { scan = nil },
                                  onOpenPending: { showPending = true },
@@ -108,6 +123,21 @@ public struct LibraryWindowView: View {
     private func confirm(_ id: PersistentIdentifier) {
         guard let title = titles.first(where: { $0.persistentModelID == id }) else { return }
         try? LibraryEditor(context: context).confirm(title)
+    }
+
+    private func removePendingTitle() {
+        guard let id = pendingRemoval,
+              let title = titles.first(where: { $0.persistentModelID == id }) else {
+            pendingRemoval = nil
+            return
+        }
+        do {
+            try LibraryEditor(context: context).removeFromLibrary(title)
+            if route == id { route = nil }
+        } catch {
+            Self.logger.error("remove from library failed: \(error.localizedDescription, privacy: .public)")
+        }
+        pendingRemoval = nil
     }
 
     // MARK: - Scanning
@@ -162,6 +192,7 @@ public struct LibraryWindowView: View {
 private struct ArchiveScreen: View {
     let title: Title
     var onBack: () -> Void
+    var onRemove: () -> Void
     /// Called when a rebind merged this work into a different (existing) Title,
     /// so this archive page now points at a deleted model and must navigate away.
     var onMergedAway: (PersistentIdentifier) -> Void = { _ in }
@@ -189,7 +220,8 @@ private struct ArchiveScreen: View {
                     onMatchSheet: { showMatchSheet = true },
                     onToggleWatched: { watched in
                         _ = try? WatchProgressWriter(context: context).setWatched(watched, for: title)
-                    })
+                    },
+                    onRemove: onRemove)
             .sheet(isPresented: $showMatchSheet) {
                 ManualMatchSheet(
                     initialQuery: title.titleZh ?? title.titleJa ?? "",

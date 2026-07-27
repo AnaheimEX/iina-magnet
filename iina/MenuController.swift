@@ -599,7 +599,21 @@ class MenuController: NSObject, NSMenuDelegate {
     }
   }
 
+  /// Resolves the active player only after the current initialization stack has
+  /// unwound. This also prevents a non-active or plugin-managed PlayerCore from
+  /// temporarily replacing the global plugin menu with its own inventory.
+  func requestPluginMenuUpdate() {
+    DispatchQueue.main.async { [weak self] in
+      self?.updatePluginMenu()
+    }
+  }
+
   func updatePluginMenu() {
+    // Plugin state can change while a startup migration sheet is closing,
+    // before MainMenu.nib has bound this weak outlet. A menu refresh is derived
+    // UI state, so skipping that premature refresh is safer than trapping on an
+    // implicitly unwrapped nil; the normal post-launch refresh rebuilds it.
+    guard pluginMenu != nil else { return }
     let isDisplayingPluginsPanel = PlayerCore.active.mainWindow.sideBarStatus == .plugins
     let managePluginsItem = NSMenuItem(
       title: Constants.String.managePlugins,
@@ -688,6 +702,28 @@ class MenuController: NSObject, NSMenuDelegate {
     }
     pluginMenu.addItem(reloadPluginsItem)
 
+  }
+
+  /// Releases menu-owned plugin instances before replacing the static plugin
+  /// inventory. Without this preflight, developer-tool items keep old instances
+  /// alive until a new plugin calls `menu.forceUpdate()`, causing old teardown to
+  /// re-enter the middle of new-plugin initialization.
+  func preparePluginMenuForReload() {
+    guard pluginMenu != nil else { return }
+
+    func releasePluginInstances(in menu: NSMenu) {
+      for item in menu.items {
+        if item.representedObject is JavascriptPluginInstance {
+          item.representedObject = nil
+        }
+        if let submenu = item.submenu {
+          releasePluginInstances(in: submenu)
+        }
+      }
+    }
+
+    releasePluginInstances(in: pluginMenu)
+    pluginMenu.removeAllItems()
   }
 
   @discardableResult

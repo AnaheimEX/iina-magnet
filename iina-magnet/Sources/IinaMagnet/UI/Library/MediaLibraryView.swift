@@ -27,6 +27,7 @@ public struct MediaLibraryView: View {
     private let items: [LibraryItemViewModel]
     private let displayState: LibraryDisplayState
     private let onOpen: (PersistentIdentifier) -> Void
+    private let onRemove: (PersistentIdentifier) -> Void
     private let onScan: () -> Void
     private let onCancelScan: () -> Void
     private let onOpenPending: (() -> Void)?
@@ -56,6 +57,7 @@ public struct MediaLibraryView: View {
     public init(items: [LibraryItemViewModel],
                 displayState: LibraryDisplayState = .normal,
                 onOpen: @escaping (PersistentIdentifier) -> Void = { _ in },
+                onRemove: @escaping (PersistentIdentifier) -> Void = { _ in },
                 onScan: @escaping () -> Void = {},
                 onCancelScan: @escaping () -> Void = {},
                 onOpenPending: (() -> Void)? = nil,
@@ -64,6 +66,7 @@ public struct MediaLibraryView: View {
         self.items = items
         self.displayState = displayState
         self.onOpen = onOpen
+        self.onRemove = onRemove
         self.onScan = onScan
         self.onCancelScan = onCancelScan
         self.onOpenPending = onOpenPending
@@ -217,7 +220,9 @@ public struct MediaLibraryView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: LibraryTokens.Spacing.wallGap)],
                       spacing: LibraryTokens.Spacing.wallGap) {
                 ForEach(filtered) { item in
-                    PosterCard(item: item) { onOpen(item.id) }
+                    PosterCard(item: item,
+                               onOpen: { onOpen(item.id) },
+                               onRemove: { onRemove(item.id) })
                 }
             }
             .padding(LibraryTokens.Spacing.pagePadding)
@@ -228,7 +233,9 @@ public struct MediaLibraryView: View {
         ScrollView {
             LazyVStack(spacing: 4) {
                 ForEach(filtered) { item in
-                    LibraryListRow(item: item) { onOpen(item.id) }
+                    LibraryListRow(item: item,
+                                   onOpen: { onOpen(item.id) },
+                                   onRemove: { onRemove(item.id) })
                 }
             }
             .padding(.horizontal, LibraryTokens.Spacing.pagePadding)

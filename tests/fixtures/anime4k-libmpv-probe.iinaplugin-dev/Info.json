@@ -1,0 +1,20 @@
+{
+  "name": "Anime4K libmpv Contract Probe",
+  "author": {
+    "name": "IINA Magnet Contributors"
+  },
+  "identifier": "io.iina.anime4k.libmpv-probe",
+  "version": "1.0.0",
+  "description": "Repository-owned Debug probe for the glsl-shaders native-array contract.",
+  "entry": "main.js",
+  "permissions": [],
+  "preferenceDefaults": {
+    "run_id": "",
+    "app_path": "",
+    "input_array": [],
+    "owned_paths": [],
+    "latest_state_array": [],
+    "expected_cleanup_array": [],
+    "feature_paths": {}
+  }
+}

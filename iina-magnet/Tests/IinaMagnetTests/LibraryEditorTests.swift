@@ -225,4 +225,39 @@ struct LibraryEditorTests {
         #expect(queue.count == 2)
         #expect(!queue.contains { $0.matchState == .confirmed })
     }
+
+    @Test("removeFromLibrary deletes the catalog tree but preserves source files")
+    func removeFromLibraryPreservesSourceFiles() throws {
+        let ctx = makeContext()
+        let sourceURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("iina-magnet-library-remove-\(UUID().uuidString).mkv")
+        try Data("video".utf8).write(to: sourceURL)
+        defer { try? FileManager.default.removeItem(at: sourceURL) }
+
+        let title = Title(kind: .movie, titleZh: "测试电影", matchState: .confirmed)
+        let season = Season(number: 0); season.title = title; title.seasons.append(season)
+        let episode = Episode(number: 0, seasonNumber: 0); episode.season = season
+        season.episodes.append(episode)
+        let version = VersionFile(fileURL: sourceURL, fileFingerprint: "remove-fp",
+                                  fileSizeBytes: 5, resolution: "1080p")
+        version.episode = episode; episode.versions.append(version)
+        let progress = WatchProgress(title: title, seasonNumber: 0, episodeNumber: 0,
+                                     lastPositionSec: 10, durationSec: 100, state: .inProgress)
+        title.watchProgresses.append(progress)
+        ctx.insert(title)
+        ctx.insert(season)
+        ctx.insert(episode)
+        ctx.insert(version)
+        ctx.insert(progress)
+        try ctx.save()
+
+        try LibraryEditor(context: ctx).removeFromLibrary(title)
+
+        #expect(try ctx.fetch(FetchDescriptor<Title>()).isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<Season>()).isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<Episode>()).isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<VersionFile>()).isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<WatchProgress>()).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: sourceURL.path))
+    }
 }

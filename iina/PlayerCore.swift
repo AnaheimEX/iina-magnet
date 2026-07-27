@@ -325,34 +325,46 @@ class PlayerCore: NSObject {
   }
 
   func clearPlugins() {
+    var prepared = Set<ObjectIdentifier>()
+    (plugins + Array(pluginMap.values)).forEach { instance in
+      if prepared.insert(ObjectIdentifier(instance)).inserted {
+        instance.prepareForUnload()
+      }
+    }
     pluginMap.removeAll()
     plugins.removeAll()
   }
 
   func loadPlugins() {
-    pluginMap.removeAll()
+    clearPlugins()
     plugins = JavascriptPlugin.plugins.compactMap { plugin in
       guard plugin.enabled else { return nil }
       let instance = JavascriptPluginInstance(player: self, plugin: plugin)
       pluginMap[plugin.identifier] = instance
       return instance
     }
+    mainWindow.pluginView.updatePluginTabs()
+    AppDelegate.shared.menuController?.requestPluginMenuUpdate()
   }
 
   func reloadPlugin(_ plugin: JavascriptPlugin, forced: Bool = false) {
     let id = plugin.identifier
-    if let _ = pluginMap[id] {
+    if let oldInstance = pluginMap[id] {
       if plugin.enabled {
         // no need to reload, unless forced
         guard forced else { return }
-        pluginMap[id] = JavascriptPluginInstance(player: self, plugin: plugin)
-      } else {
-        pluginMap.removeValue(forKey: id)
       }
-    } else {
-      guard plugin.enabled else { return }
-      pluginMap[id] = JavascriptPluginInstance(player: self, plugin: plugin)
+      oldInstance.prepareForUnload()
+      pluginMap.removeValue(forKey: id)
+      plugins.removeAll { $0 === oldInstance }
     }
+
+    guard plugin.enabled else {
+      plugins = JavascriptPlugin.plugins.compactMap { pluginMap[$0.identifier] }
+      mainWindow.pluginView.updatePluginTabs()
+      return
+    }
+    pluginMap[id] = JavascriptPluginInstance(player: self, plugin: plugin)
 
     plugins = JavascriptPlugin.plugins.compactMap { pluginMap[$0.identifier] }
     mainWindow.pluginView.updatePluginTabs()

@@ -107,6 +107,7 @@ class JavascriptPlugin: NSObject {
   let defaultPreferences: [String: Any]
 
   static func recreateAllPlugins() {
+    plugins.forEach { $0.unloadGlobalInstance() }
     plugins = loadPlugins()
   }
 
@@ -170,11 +171,17 @@ class JavascriptPlugin: NSObject {
       if enabled {
         // no need to reload, unless forced
         guard forced else { return }
+        unloadGlobalInstance()
         globalInstance = .init(player: nil, plugin: self)
       } else {
-        globalInstance = nil
+        unloadGlobalInstance()
       }
     }
+  }
+
+  private func unloadGlobalInstance() {
+    globalInstance?.prepareForUnload()
+    globalInstance = nil
   }
 
   static func savePluginOrder(_ values: [JavascriptPlugin]? = nil) {
@@ -480,6 +487,7 @@ class JavascriptPlugin: NSObject {
 
   @discardableResult
   func remove() -> Int? {
+    unloadGlobalInstance()
     let pos = JavascriptPlugin.plugins.firstIndex(of: self)
     if let pos = pos {
       JavascriptPlugin.plugins.remove(at: pos)

@@ -241,6 +241,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
 
     Logger.log("App will launch")
 
+    // Prepare fork-managed packages from raw filesystem state before the lazy
+    // JavascriptPlugin inventory is touched or any plugin instance can load.
+    BundledPluginManager.shared.prepare()
+
     // Start asynchronously gathering and caching information about the hardware decoding
     // capabilities of this Mac.
     HardwareDecodeCapabilities.shared.checkCapabilities()
@@ -270,7 +274,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
       if let pluginPath = Bundle.main.resourcePath?.appending("/plugins"),
          FileManager.default.fileExists(atPath: pluginPath),
          let contents = try? FileManager.default.contentsOfDirectory(atPath: pluginPath) {
-        contents.filter { $0.hasSuffix(".iinaplgz") }
+        contents.filter {
+          $0.hasSuffix(".iinaplgz") && !BundledPluginManager.managesBundledArchive(named: $0)
+        }
           .forEach {
             do {
               let path = pluginPath.appending("/\($0)")
@@ -365,6 +371,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     if !isReady {
       getReady()
     }
+    BundledPluginManager.shared.presentPendingResolution()
 
     // see https://sparkle-project.org/documentation/api-reference/Classes/SPUUpdater.html#/c:objc(cs)SPUUpdater(im)clearFeedURLFromUserDefaults
     updaterController.updater.clearFeedURLFromUserDefaults()
@@ -1029,11 +1036,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
   }
 
   @objc func reloadAllPlugins(_ sender: NSMenuItem) {
-    // Remove the developer tool menu item that retains the plugin instance
-    AppDelegate.shared.menuController.pluginMenu.items
-      .compactMap { $0.submenu }.flatMap { $0.items }
-      .forEach { $0.representedObject = nil }
-    AppDelegate.shared.menuController.pluginMenu.removeAllItems()
+    menuController.preparePluginMenuForReload()
 
     for player in PlayerCore.playerCores {
       player.clearPlugins()

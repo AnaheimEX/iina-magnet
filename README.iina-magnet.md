@@ -3,7 +3,8 @@
 > Private fork of [iina](https://github.com/iina/iina) (GPL-3.0) that adds a
 > built-in **media library** for anime / movies, a **PikPak** cloud-drive
 > integration (browse + direct cloud play), and a **Mikan (蜜柑计划)** browser
-> that saves torrents straight into PikPak — closing the loop:
+> that saves torrents straight into PikPak, plus a bundled, offline
+> **Anime4K** real-time shader plugin — closing the loop:
 > *discover on Mikan → store in PikPak → play from the cloud, or scan & organize
 > your local files.*
 >
@@ -85,31 +86,96 @@ contents up so everything stays comfortably clickable.
   download) or **save & cloud-play**. Saves land in PikPak's
   `Pack From Shared` folder with their real titles.
 
+### Anime4K real-time enhancement
+
+Anime4K is bundled with the app; no shader download or separate plugin install
+is required. It changes playback only after you opt in.
+
+#### Enable and choose a preset
+
+1. Open a video, then open **Anime4K** from IINA's **Plugins** menu or its
+   sidebar tab.
+2. A fresh install starts at **Off**. The safe starting combination is
+   **Fast + A**: leave quality on Fast and choose Mode A.
+3. Choose a quality tier and mode:
+   - **Fast** — release/default tier and the first choice for normal playback.
+   - **HQ** — heavier chains; real-time playback is not guaranteed on every Mac.
+   - **A / B / C** — the three upstream-defined single-mode choices.
+   - **A+A / B+B / C+A** — heavier double-pass combinations. IINA warns, but
+     never silently changes your choice.
+4. **Auto Apply** re-applies the selected non-Off preset when the next file is
+   loaded. Turning Auto Apply off affects later file loads; choose **Off** to
+   remove Anime4K from the current player immediately.
+
+Local paths and cloud URLs use the same player-level `file-loaded` behavior.
+That parity is covered by automated tests; a credentialed live PikPak playback
+smoke is still a release-checklist item, not a currently claimed result.
+
+#### Shortcuts
+
+The defaults are configurable in the Anime4K sidebar:
+
+| Binding | Action |
+| --- | --- |
+| `Ctrl+0` | Off |
+| `Ctrl+1` … `Ctrl+6` | A, B, C, A+A, B+B, C+A |
+| `Ctrl+7` | Fast |
+| `Ctrl+8` | HQ |
+
+The first successful activation shows a one-time, non-blocking shortcut hint.
+Use **Show Shortcuts** to display it again. Invalid, duplicate, or conflicting
+bindings are shown as issues and are not installed as menu accelerators; the
+menu actions remain available. Leaving a shortcut field empty unassigns it.
+
+#### Repair, diagnostics, and rollback
+
+- **Repair Shader Bundle** validates the pinned materialized shader files and
+  repairs missing/corrupt owned files from the bundled offline payload.
+- **Diagnostics** shows integrity state plus the latest mpv frame-counter
+  sample: fps, adverse-frame delta, denominator, ratio, consecutive windows,
+  and frame budget (`1000/fps`). It does **not** measure shader-pass time.
+- **Off** is the normal rollback: it removes only Anime4K-owned shader paths and
+  preserves unrelated user/plugin GLSL entries and their order.
+- For a persistent full disable, choose Off, then disable **Anime4K** in IINA's
+  plugin settings. Managed app updates preserve the user's disabled state.
+- Do not manually delete the managed package: the app may reinstall it on the
+  next launch. Use plugin disable for a stable rollback.
+
+Performance warnings are advisory only: telemetry waits 10 seconds, samples
+every 2 seconds, and warns after three consecutive windows above 1%. Automated
+tests prove the warning/no-auto-switch logic, but do not prove real-time Fast or
+HQ performance on your GPU. Hardware release qualification remains
+[`PENDING`](docs/ANIME4K_TESTING.md) until the documented 60-second
+Off/Fast measurements and visual smoke are recorded.
+
 ---
 
 ## Architecture (1-minute tour)
 
-- Almost everything lives in the isolated Swift package
+- Most product code lives in the isolated Swift package
   [`iina-magnet/`](iina-magnet) (`IinaMagnet` library + tests). Upstream IINA
-  never touches it.
-- The iina side has only a few small, comment-marked hooks
-  (`// MARK: iina-magnet hook`): `iina/IinaMagnetBridge.swift` (new),
-  `iina/AppDelegate.swift`, `iina/InitialWindowController.swift`.
+  never touches it. Anime4K's plugin source is isolated under
+  `deps/plugins-src/anime4k/`.
+- The iina side has a small set of host hooks for the library and the managed
+  Anime4K lifecycle. The exact list is maintained in
+  [`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md); do not assume it is limited
+  to the original bridge/start-window files.
 - This keeps the fork easy to maintain — see **Following upstream** below.
 - **Continuing development?** Start from
-  [`docs/DEV_STATUS.md`](docs/DEV_STATUS.md): current state, the workflow
-  assumptions that drive priorities, gotchas (PikPak/Mikan internals), and the
-  optimization / feature backlog.
+  [`docs/DEV_STATUS.md`](docs/DEV_STATUS.md): the single current code/test status
+  and the remaining validation gaps.
 
 ---
 
 ## Roadmap / TODO
 
-Shipped and verified: media library (scan / match / archive / watch progress /
+Shipped and verified by automated gates: media library (scan / match / archive / watch progress /
 tags / filters), PikPak (web login, browse + **in-folder filter & cached
 navigation**, sort, cloud play, offline download, **offline-task center**),
 Mikan → PikPak save & cloud-play, screen-adaptive window scaling, upstream-sync
-tooling.
+tooling, and bundled default-off Anime4K package/runtime behavior. Live
+Anime4K GUI, credentialed PikPak playback, and hardware performance claims stay
+pending until the release checklist is completed.
 
 **Current focus — speed up the one-shot cloud loop** (the actual workflow:
 discover on Mikan → save → watch once → done; cloud content is *not* kept or
@@ -187,6 +253,9 @@ features:
 
 Full workflow, the fork-modification manifest, and conflict-resolution tips:
 [`docs/UPSTREAM_SYNC.md`](docs/UPSTREAM_SYNC.md).
+
+Anime4K hands-on test procedure and hardware gates:
+[`docs/ANIME4K_TESTING.md`](docs/ANIME4K_TESTING.md).
 
 ---
 

@@ -1,0 +1,249 @@
+{
+  "plugin": {
+    "identifier": "io.iina.magnet.anime4k",
+    "version": "1.0.2"
+  },
+  "presets": {
+    "fast": {
+      "A": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_M",
+        "Anime4K_Upscale_CNN_x2_M",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_S"
+      ],
+      "A+A": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_M",
+        "Anime4K_Upscale_CNN_x2_M",
+        "Anime4K_Restore_CNN_S",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_S"
+      ],
+      "B": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_Soft_M",
+        "Anime4K_Upscale_CNN_x2_M",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_S"
+      ],
+      "B+B": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_Soft_M",
+        "Anime4K_Upscale_CNN_x2_M",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Restore_CNN_Soft_S",
+        "Anime4K_Upscale_CNN_x2_S"
+      ],
+      "C": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Upscale_Denoise_CNN_x2_M",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_S"
+      ],
+      "C+A": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Upscale_Denoise_CNN_x2_M",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Restore_CNN_S",
+        "Anime4K_Upscale_CNN_x2_S"
+      ]
+    },
+    "hq": {
+      "A": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_VL",
+        "Anime4K_Upscale_CNN_x2_VL",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_M"
+      ],
+      "A+A": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_VL",
+        "Anime4K_Upscale_CNN_x2_VL",
+        "Anime4K_Restore_CNN_M",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_M"
+      ],
+      "B": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_Soft_VL",
+        "Anime4K_Upscale_CNN_x2_VL",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_M"
+      ],
+      "B+B": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Restore_CNN_Soft_VL",
+        "Anime4K_Upscale_CNN_x2_VL",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Restore_CNN_Soft_M",
+        "Anime4K_Upscale_CNN_x2_M"
+      ],
+      "C": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Upscale_Denoise_CNN_x2_VL",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Upscale_CNN_x2_M"
+      ],
+      "C+A": [
+        "Anime4K_Clamp_Highlights",
+        "Anime4K_Upscale_Denoise_CNN_x2_VL",
+        "Anime4K_AutoDownscalePre_x2",
+        "Anime4K_AutoDownscalePre_x4",
+        "Anime4K_Restore_CNN_M",
+        "Anime4K_Upscale_CNN_x2_M"
+      ]
+    },
+    "off": []
+  },
+  "schemaVersion": 1,
+  "shaderBundleVersion": 1,
+  "shaders": [
+    {
+      "file": "Anime4K_Clamp_Highlights.glsl",
+      "id": "Anime4K_Clamp_Highlights",
+      "license": "MIT",
+      "order": 0,
+      "sha256": "a2a9bf7fbc1d75d09660ca2e701e4d7fb0cf5457b94da47e1825032fa2b3671a",
+      "size": 2795,
+      "sourcePath": "glsl/Restore/Anime4K_Clamp_Highlights.glsl"
+    },
+    {
+      "file": "Anime4K_Restore_CNN_M.glsl",
+      "id": "Anime4K_Restore_CNN_M",
+      "license": "MIT",
+      "order": 1,
+      "sha256": "67ea3ed26539e8de3b7d307688535d2ff17e8d147e11dda0247da7770dbecf41",
+      "size": 35916,
+      "sourcePath": "glsl/Restore/Anime4K_Restore_CNN_M.glsl"
+    },
+    {
+      "file": "Anime4K_Restore_CNN_S.glsl",
+      "id": "Anime4K_Restore_CNN_S",
+      "license": "MIT",
+      "order": 2,
+      "sha256": "97c24dc370ab300c108bfaa09db7f175aeff343674842c299cf3940a3d330427",
+      "size": 17136,
+      "sourcePath": "glsl/Restore/Anime4K_Restore_CNN_S.glsl"
+    },
+    {
+      "file": "Anime4K_Restore_CNN_VL.glsl",
+      "id": "Anime4K_Restore_CNN_VL",
+      "license": "MIT",
+      "order": 3,
+      "sha256": "35036722733305cd4d4e57660b883bbe2569ba2914033c254327107d7b77e35e",
+      "size": 144075,
+      "sourcePath": "glsl/Restore/Anime4K_Restore_CNN_VL.glsl"
+    },
+    {
+      "file": "Anime4K_Restore_CNN_Soft_M.glsl",
+      "id": "Anime4K_Restore_CNN_Soft_M",
+      "license": "MIT",
+      "order": 4,
+      "sha256": "a78a2c76898e08e09e442a9628c64208c26e8e15789649b8755223f009794c02",
+      "size": 36016,
+      "sourcePath": "glsl/Restore/Anime4K_Restore_CNN_Soft_M.glsl"
+    },
+    {
+      "file": "Anime4K_Restore_CNN_Soft_S.glsl",
+      "id": "Anime4K_Restore_CNN_Soft_S",
+      "license": "MIT",
+      "order": 5,
+      "sha256": "9f6867f2ef42786729522d86fe24147cb4ea145418e3974df70496acf52dc392",
+      "size": 17198,
+      "sourcePath": "glsl/Restore/Anime4K_Restore_CNN_Soft_S.glsl"
+    },
+    {
+      "file": "Anime4K_Restore_CNN_Soft_VL.glsl",
+      "id": "Anime4K_Restore_CNN_Soft_VL",
+      "license": "MIT",
+      "order": 6,
+      "sha256": "094334b0e20c1a201fe4941c7c68de72451e5aee9efb5524d7fb82b12dca64b9",
+      "size": 144204,
+      "sourcePath": "glsl/Restore/Anime4K_Restore_CNN_Soft_VL.glsl"
+    },
+    {
+      "file": "Anime4K_Upscale_CNN_x2_M.glsl",
+      "id": "Anime4K_Upscale_CNN_x2_M",
+      "license": "MIT",
+      "order": 7,
+      "sha256": "716e02098a68f0d648761f2b96b4dd139e1cb09b174bb369fca3aa34328fff7e",
+      "size": 37685,
+      "sourcePath": "glsl/Upscale/Anime4K_Upscale_CNN_x2_M.glsl"
+    },
+    {
+      "file": "Anime4K_Upscale_CNN_x2_S.glsl",
+      "id": "Anime4K_Upscale_CNN_x2_S",
+      "license": "MIT",
+      "order": 8,
+      "sha256": "4c53ec2e287908f7ee7bcb266b0170421626d663576468b7d7dafc62962649a4",
+      "size": 18638,
+      "sourcePath": "glsl/Upscale/Anime4K_Upscale_CNN_x2_S.glsl"
+    },
+    {
+      "file": "Anime4K_Upscale_CNN_x2_VL.glsl",
+      "id": "Anime4K_Upscale_CNN_x2_VL",
+      "license": "MIT",
+      "order": 9,
+      "sha256": "5638fe31c37c151a3443fea3451a3ef91af073f4dbb9615f6c0d1e29db11493d",
+      "size": 146743,
+      "sourcePath": "glsl/Upscale/Anime4K_Upscale_CNN_x2_VL.glsl"
+    },
+    {
+      "file": "Anime4K_AutoDownscalePre_x2.glsl",
+      "id": "Anime4K_AutoDownscalePre_x2",
+      "license": "Unlicense",
+      "order": 10,
+      "sha256": "8c58291740146bd766a4d73f132775a797fe80f7d07919b5d767e27a5dc85656",
+      "size": 1560,
+      "sourcePath": "glsl/Upscale/Anime4K_AutoDownscalePre_x2.glsl"
+    },
+    {
+      "file": "Anime4K_AutoDownscalePre_x4.glsl",
+      "id": "Anime4K_AutoDownscalePre_x4",
+      "license": "Unlicense",
+      "order": 11,
+      "sha256": "5af62d8cd844916dc1126613e13bad3beab195787f93a71200b47c6ec78f2e41",
+      "size": 1568,
+      "sourcePath": "glsl/Upscale/Anime4K_AutoDownscalePre_x4.glsl"
+    },
+    {
+      "file": "Anime4K_Upscale_Denoise_CNN_x2_M.glsl",
+      "id": "Anime4K_Upscale_Denoise_CNN_x2_M",
+      "license": "MIT",
+      "order": 12,
+      "sha256": "8c72b042e2301fe66a45c3089720459148e2504cd72af16f9c0d5017ff14181e",
+      "size": 37714,
+      "sourcePath": "glsl/Upscale+Denoise/Anime4K_Upscale_Denoise_CNN_x2_M.glsl"
+    },
+    {
+      "file": "Anime4K_Upscale_Denoise_CNN_x2_VL.glsl",
+      "id": "Anime4K_Upscale_Denoise_CNN_x2_VL",
+      "license": "MIT",
+      "order": 13,
+      "sha256": "359c48fe5a317fbc6b706ce368401eef496e84ed98abac7a43efebca2b65d79b",
+      "size": 146811,
+      "sourcePath": "glsl/Upscale+Denoise/Anime4K_Upscale_Denoise_CNN_x2_VL.glsl"
+    }
+  ],
+  "upstream": {
+    "commit": "7684e9586f8dcc738af08a1cdceb024cc184f426",
+    "licenses": [
+      "MIT",
+      "Unlicense"
+    ],
+    "repository": "bloc97/Anime4K"
+  }
+}

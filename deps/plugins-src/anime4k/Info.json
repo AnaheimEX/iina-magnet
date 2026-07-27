@@ -1,0 +1,44 @@
+{
+  "author": {
+    "name": "IINA Magnet Contributors"
+  },
+  "description": "Bundled Anime4K integration for IINA Magnet.",
+  "entry": "main.js",
+  "identifier": "io.iina.magnet.anime4k",
+  "iinaMagnetManaged": {
+    "contentManifestDigest": "sha256:210534ed39356d083fac996cca71b3f7ea999fcc691cf98ffa9eeb18a27181f0",
+    "owner": "iina-magnet",
+    "packageSchemaVersion": 1,
+    "version": "1.0.2"
+  },
+  "name": "Anime4K",
+  "permissions": [
+    "show-osd"
+  ],
+  "preferenceDefaults": {
+    "autoApply": true,
+    "hasActivated": false,
+    "lastMode": "A",
+    "lastQuality": "fast",
+    "mode": "off",
+    "quality": "fast",
+    "schemaVersion": 1,
+    "shaderBundleVersion": 1,
+    "shortcutHintAcknowledged": false,
+    "shortcuts": {
+      "A": "Ctrl+1",
+      "A+A": "Ctrl+4",
+      "B": "Ctrl+2",
+      "B+B": "Ctrl+5",
+      "C": "Ctrl+3",
+      "C+A": "Ctrl+6",
+      "fast": "Ctrl+7",
+      "hq": "Ctrl+8",
+      "off": "Ctrl+0"
+    }
+  },
+  "sidebarTab": {
+    "name": "Anime4K"
+  },
+  "version": "1.0.2"
+}

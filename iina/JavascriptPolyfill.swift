@@ -8,51 +8,87 @@
 
 import JavaScriptCore
 
+private final class JavascriptTimerContext {
+  let identifier: String
+  let callback: JSValue
+  let repeats: Bool
+
+  init(identifier: String, callback: JSValue, repeats: Bool) {
+    self.identifier = identifier
+    self.callback = callback
+    self.repeats = repeats
+  }
+}
+
 class JavascriptPolyfill {
   weak var plugin: JavascriptPluginInstance!
-  var timers = [String: Timer]()
+  private var timers = [String: Timer]()
+  private var pendingTimerIDs = Set<String>()
 
   init(pluginInstance: JavascriptPluginInstance) {
     self.plugin = pluginInstance
   }
 
   deinit {
-    for timer in timers.values {
-      timer.invalidate()
+    removeAllTimers()
+  }
+
+  private func onMainThread(_ action: () -> Void) {
+    if Thread.isMainThread {
+      action()
+    } else {
+      DispatchQueue.main.sync(execute: action)
     }
   }
 
   func removeAllTimers() {
-    for timer in timers.values {
-      timer.invalidate()
+    onMainThread {
+      pendingTimerIDs.removeAll()
+      for timer in timers.values {
+        timer.invalidate()
+      }
+      timers.removeAll()
     }
-    timers.removeAll()
   }
 
   func removeTimer(identifier: String) {
-    let timer = self.timers.removeValue(forKey: identifier)
-    timer?.invalidate()
+    onMainThread {
+      pendingTimerIDs.remove(identifier)
+      let timer = timers.removeValue(forKey: identifier)
+      timer?.invalidate()
+    }
   }
 
   func createTimer(callback: JSValue, ms: Double, repeats : Bool) -> String {
     let timeInterval  = ms/1000.0
     let uuid = NSUUID().uuidString
+    onMainThread {
+      pendingTimerIDs.insert(uuid)
+    }
 
-    DispatchQueue.main.async(execute: {
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.pendingTimerIDs.remove(uuid) != nil else { return }
+      let context = JavascriptTimerContext(identifier: uuid, callback: callback, repeats: repeats)
       let timer = Timer.scheduledTimer(timeInterval: timeInterval,
                                        target: self,
                                        selector: #selector(self.callJSCallback),
-                                       userInfo: callback,
+                                       userInfo: context,
                                        repeats: repeats)
       self.timers[uuid] = timer
-    })
+    }
     return uuid
   }
 
   @objc func callJSCallback(_ timer: Timer) {
-    guard timer.isValid else { return }
-    let callback = (timer.userInfo as! JSValue)
-    callback.call(withArguments: nil)
+    guard timer.isValid, let context = timer.userInfo as? JavascriptTimerContext else {
+      timer.invalidate()
+      return
+    }
+    if !context.repeats {
+      timers.removeValue(forKey: context.identifier)
+      timer.invalidate()
+    }
+    context.callback.call(withArguments: nil)
   }
 
   func register(inContext context: JSContext) {

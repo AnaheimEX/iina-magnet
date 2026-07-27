@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import IinaMagnet
 import JavaScriptCore
 
 @objc protocol JavascriptAPIFileExportable: JSExport {
@@ -18,9 +19,28 @@ import JavaScriptCore
   func delete(_ path: String)
   func showInFinder(_ path: String)
   func handle(_ path: String, _ mode: String) -> JavascriptFileHandle?
+  func resolveLocal(_ path: String) -> String?
 }
 
 class JavascriptAPIFile: JavascriptAPI, JavascriptAPIFileExportable {
+  func resolveLocal(_ path: String) -> String? {
+    let dataRoot = pluginInstance.plugin.dataURL.standardizedFileURL
+    let temporaryRoot = pluginInstance.plugin.tmpURL.standardizedFileURL
+    let resolver = PluginLocalPathResolver(dataRoot: dataRoot, temporaryRoot: temporaryRoot)
+    do {
+      let resolved = try resolver.resolve(path).standardizedFileURL
+      let parent = resolved.deletingLastPathComponent().standardizedFileURL.path
+      guard parent == dataRoot.path || parent == temporaryRoot.path else {
+        throwError(withMessage: "The path does not locate inside the plugin's private directory: \"\(path)\"")
+        return nil
+      }
+      return resolved.path
+    } catch {
+      throwError(withMessage: "resolveLocal only accepts a single file in @data or @tmp: \"\(path)\"")
+      return nil
+    }
+  }
+
   func exists(_ path: String) -> Bool {
     guard let filePath = parsePath(path).path else { return false }
 

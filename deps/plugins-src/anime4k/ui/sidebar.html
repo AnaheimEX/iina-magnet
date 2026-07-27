@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="sidebar.css">
+  <title>Anime4K</title>
+</head>
+<body>
+  <main class="sidebar-container">
+    <header class="plugin-header">
+      <h1>Anime4K</h1>
+      <p class="subtitle">Real-time anime upscaling and restoration</p>
+      <p id="status" class="status" aria-live="polite">Off</p>
+    </header>
+
+    <section class="section" aria-labelledby="quality-title">
+      <h2 id="quality-title" class="section-title">Quality</h2>
+      <div class="button-group">
+        <button type="button" data-quality="fast">Fast</button>
+        <button type="button" data-quality="hq">HQ</button>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="mode-title">
+      <h2 id="mode-title" class="section-title">Mode</h2>
+      <div id="modes" class="modes-grid">
+        <button class="mode-card" type="button" data-mode="A">
+          <span class="mode-name">Mode A</span>
+          <span class="mode-description">Optimized for 1080p anime</span>
+        </button>
+        <button class="mode-card" type="button" data-mode="B">
+          <span class="mode-name">Mode B</span>
+          <span class="mode-description">Best for 720p anime</span>
+        </button>
+        <button class="mode-card" type="button" data-mode="C">
+          <span class="mode-name">Mode C</span>
+          <span class="mode-description">Denoise-first for 480p / SD anime</span>
+        </button>
+        <button class="mode-card" type="button" data-mode="A+A">
+          <span class="mode-name">Mode A+A</span>
+          <span class="mode-description">Ultra quality / aggressive 1080p restoration</span>
+        </button>
+        <button class="mode-card" type="button" data-mode="B+B">
+          <span class="mode-name">Mode B+B</span>
+          <span class="mode-description">Ultra quality / softer double pass</span>
+        </button>
+        <button class="mode-card" type="button" data-mode="C+A">
+          <span class="mode-name">Mode C+A</span>
+          <span class="mode-description">Denoise plus extra reconstruction for difficult low-resolution sources</span>
+        </button>
+      </div>
+      <button id="off" class="off-button" type="button">Turn Off Anime4K</button>
+    </section>
+
+    <section class="section options-section" aria-labelledby="options-title">
+      <h2 id="options-title" class="section-title">Options</h2>
+      <label class="toggle-label">
+        <input id="auto-apply" type="checkbox">
+        <span>
+          <strong>Auto Apply</strong>
+          <small>Restore the last mode when a file starts</small>
+        </span>
+      </label>
+    </section>
+
+    <details class="advanced-section">
+      <summary>Advanced &amp; Maintenance</summary>
+      <div class="advanced-content">
+        <section class="advanced-group" aria-labelledby="shortcuts-title">
+          <h2 id="shortcuts-title" class="section-title">Shortcuts</h2>
+          <div id="shortcut-fields" class="shortcut-fields"></div>
+          <p id="shortcut-issues" class="issues" hidden></p>
+          <div class="action-row">
+            <button id="save-shortcuts" type="button">Apply Shortcuts</button>
+            <button id="show-shortcuts" type="button">Show Shortcuts</button>
+          </div>
+        </section>
+
+        <section class="advanced-group" aria-labelledby="maintenance-title">
+          <h2 id="maintenance-title" class="section-title">Maintenance</h2>
+          <div class="action-row">
+            <button id="repair" type="button">Repair Shader Bundle</button>
+            <button id="diagnostics" type="button">Diagnostics</button>
+          </div>
+        </section>
+      </div>
+    </details>
+
+    <aside id="hint" class="message-panel" hidden></aside>
+    <pre id="diagnostic-output" class="message-panel" hidden></pre>
+  </main>
+  <script src="sidebar.js"></script>
+</body>
+</html>

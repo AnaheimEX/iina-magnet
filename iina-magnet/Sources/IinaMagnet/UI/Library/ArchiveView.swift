@@ -19,6 +19,7 @@ public struct ArchiveView: View {
     private let onMarkUnmatched: () -> Void
     private let onMatchSheet: () -> Void
     private let onToggleWatched: (Bool) -> Void
+    private let onRemove: () -> Void
 
     public init(vm: ArchiveViewModel,
                 fileInfo: FileInfo? = nil,
@@ -28,7 +29,8 @@ public struct ArchiveView: View {
                 onConfirm: @escaping () -> Void = {},
                 onMarkUnmatched: @escaping () -> Void = {},
                 onMatchSheet: @escaping () -> Void = {},
-                onToggleWatched: @escaping (Bool) -> Void = { _ in }) {
+                onToggleWatched: @escaping (Bool) -> Void = { _ in },
+                onRemove: @escaping () -> Void = {}) {
         self.vm = vm
         self.fileInfo = fileInfo
         self.onBack = onBack
@@ -38,6 +40,7 @@ public struct ArchiveView: View {
         self.onMarkUnmatched = onMarkUnmatched
         self.onMatchSheet = onMatchSheet
         self.onToggleWatched = onToggleWatched
+        self.onRemove = onRemove
     }
 
     @State private var seasonIdx = 0
@@ -191,6 +194,16 @@ public struct ArchiveView: View {
                     .background(.ultraThinMaterial, in: Capsule()).foregroundStyle(.white)
                 }.buttonStyle(.plain)
             }
+
+            Button(action: onRemove) {
+                Image(systemName: "trash")
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(9)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .help("从媒体库移除")
         }
     }
 

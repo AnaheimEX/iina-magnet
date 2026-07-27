@@ -1,0 +1,252 @@
+{
+  "archive": {
+    "file": "anime4k.iinaplgz",
+    "sha256": "sha256:1eab0a12b21a39ec7a5ede2203026e78c0ba032a51d3d24240fc50cdf30e3d26",
+    "size": 1728416
+  },
+  "contentManifestDigest": "sha256:210534ed39356d083fac996cca71b3f7ea999fcc691cf98ffa9eeb18a27181f0",
+  "entries": [
+    {
+      "kind": "file",
+      "path": "FORK_NOTICE.md",
+      "posixPermissions": 420,
+      "sha256": "sha256:e76a791f0c5398b7bb36ecfdea2d7bf6ac86cb688a889d8c05d31b139a68e83d",
+      "size": 1097
+    },
+    {
+      "kind": "file",
+      "path": "Info.json",
+      "posixPermissions": 420,
+      "sha256": "sha256:96c20208114c3f65a49b73e4247d95d0a8795c7adce4bf0899896e3954c840c1",
+      "size": 1022
+    },
+    {
+      "kind": "file",
+      "path": "LICENSE",
+      "posixPermissions": 420,
+      "sha256": "sha256:589ed823e9a84c56feb95ac58e7cf384626b9cbf4fda2a907bc36e103de1bad2",
+      "size": 35141
+    },
+    {
+      "kind": "file",
+      "path": "THIRD_PARTY_NOTICES.md",
+      "posixPermissions": 420,
+      "sha256": "sha256:5a07e30634695058d97a3a0db9a140f67aa19696a1298a413951940c7ac90bd6",
+      "size": 1748
+    },
+    {
+      "kind": "file",
+      "path": "lib/integrity.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:82aa5c162b6bef00298aba1194dcd492136c5793f38226022c86415f9085045a",
+      "size": 12511
+    },
+    {
+      "kind": "file",
+      "path": "lib/presets.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:02f2d18fc3d56b944f607ee47bde141f4766fc669300e29d60a648730f5377fd",
+      "size": 80
+    },
+    {
+      "kind": "file",
+      "path": "lib/reconcile.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:81e8a0cdb53c57543c71f017692a2d1313774d66dc6d2454759936ab5c10bcd3",
+      "size": 9898
+    },
+    {
+      "kind": "file",
+      "path": "lib/runtime.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:dbd2627195a280b182750e0c8479e174bf1f7b02062c08cc7fcc474a58101259",
+      "size": 26452
+    },
+    {
+      "kind": "file",
+      "path": "lib/sha256.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:9acc132041a6b5d03ec1f8670be9e073c66c50f7629dd969c6b3ea1c8761fe8c",
+      "size": 5677
+    },
+    {
+      "kind": "file",
+      "path": "lib/shader-bundle.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:04a804dd804dc5c3188cbb8d55453eea89fe732ebbcdf772fbfefe471a593b9b",
+      "size": 802626
+    },
+    {
+      "kind": "file",
+      "path": "lib/shortcuts.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:8fe32823a30fb19e4d2e635c8ab369502047c909c8f67d8d6b5866ed48c530f3",
+      "size": 4311
+    },
+    {
+      "kind": "file",
+      "path": "lib/state.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:778b0a23fd93b10eecd1b76bf19f7e81bcde1da6629016265bf93e501d54de1c",
+      "size": 6724
+    },
+    {
+      "kind": "file",
+      "path": "lib/telemetry.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:4217b39d9aa3ad2e97200115410975fe551333fe26afd688919be25014c65c51",
+      "size": 4879
+    },
+    {
+      "kind": "file",
+      "path": "licenses/Anime4K-LICENSE.txt",
+      "posixPermissions": 420,
+      "sha256": "sha256:5bad448b737378e3d0c977ad0d0521fa37ad279a7e76ea9a31d9257eeb6953f5",
+      "size": 1063
+    },
+    {
+      "kind": "file",
+      "path": "licenses/AutoDownscale-Unlicense-NOTICE.txt",
+      "posixPermissions": 420,
+      "sha256": "sha256:6d27ef642b8b4a30626824b85d846f8b7df86c10ec9fd8d52799d844e47d7d5a",
+      "size": 623
+    },
+    {
+      "kind": "file",
+      "path": "main.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:b42e7578ff27d800d061633d2afa545d1c2497f44480a97a18c98dc11e71dc05",
+      "size": 848
+    },
+    {
+      "kind": "file",
+      "path": "manifest.json",
+      "posixPermissions": 420,
+      "sha256": "sha256:210534ed39356d083fac996cca71b3f7ea999fcc691cf98ffa9eeb18a27181f0",
+      "size": 7900
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_AutoDownscalePre_x2.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:8c58291740146bd766a4d73f132775a797fe80f7d07919b5d767e27a5dc85656",
+      "size": 1560
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_AutoDownscalePre_x4.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:5af62d8cd844916dc1126613e13bad3beab195787f93a71200b47c6ec78f2e41",
+      "size": 1568
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Clamp_Highlights.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:a2a9bf7fbc1d75d09660ca2e701e4d7fb0cf5457b94da47e1825032fa2b3671a",
+      "size": 2795
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Restore_CNN_M.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:67ea3ed26539e8de3b7d307688535d2ff17e8d147e11dda0247da7770dbecf41",
+      "size": 35916
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Restore_CNN_S.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:97c24dc370ab300c108bfaa09db7f175aeff343674842c299cf3940a3d330427",
+      "size": 17136
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Restore_CNN_Soft_M.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:a78a2c76898e08e09e442a9628c64208c26e8e15789649b8755223f009794c02",
+      "size": 36016
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Restore_CNN_Soft_S.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:9f6867f2ef42786729522d86fe24147cb4ea145418e3974df70496acf52dc392",
+      "size": 17198
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Restore_CNN_Soft_VL.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:094334b0e20c1a201fe4941c7c68de72451e5aee9efb5524d7fb82b12dca64b9",
+      "size": 144204
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Restore_CNN_VL.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:35036722733305cd4d4e57660b883bbe2569ba2914033c254327107d7b77e35e",
+      "size": 144075
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Upscale_CNN_x2_M.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:716e02098a68f0d648761f2b96b4dd139e1cb09b174bb369fca3aa34328fff7e",
+      "size": 37685
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Upscale_CNN_x2_S.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:4c53ec2e287908f7ee7bcb266b0170421626d663576468b7d7dafc62962649a4",
+      "size": 18638
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Upscale_CNN_x2_VL.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:5638fe31c37c151a3443fea3451a3ef91af073f4dbb9615f6c0d1e29db11493d",
+      "size": 146743
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Upscale_Denoise_CNN_x2_M.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:8c72b042e2301fe66a45c3089720459148e2504cd72af16f9c0d5017ff14181e",
+      "size": 37714
+    },
+    {
+      "kind": "file",
+      "path": "shaders/Anime4K_Upscale_Denoise_CNN_x2_VL.glsl",
+      "posixPermissions": 420,
+      "sha256": "sha256:359c48fe5a317fbc6b706ce368401eef496e84ed98abac7a43efebca2b65d79b",
+      "size": 146811
+    },
+    {
+      "kind": "file",
+      "path": "ui/sidebar.css",
+      "posixPermissions": 420,
+      "sha256": "sha256:2c18bebeab8f4142c1d16e75b890537e712da530f28d3ca0a10e94029743682f",
+      "size": 5440
+    },
+    {
+      "kind": "file",
+      "path": "ui/sidebar.html",
+      "posixPermissions": 420,
+      "sha256": "sha256:cba277877bee1d5a6922d8f6e896bec7a60395f725406fab2e21631cf1f13c51",
+      "size": 3965
+    },
+    {
+      "kind": "file",
+      "path": "ui/sidebar.js",
+      "posixPermissions": 420,
+      "sha256": "sha256:f3e699d2b974f355bf7b01aaf5a9ff01af00b88bc8dbc6ea2e9a8b7b153bca56",
+      "size": 4020
+    }
+  ],
+  "identifier": "io.iina.magnet.anime4k",
+  "packageSchemaVersion": 1,
+  "upstreamCommit": "7684e9586f8dcc738af08a1cdceb024cc184f426",
+  "version": "1.0.2"
+}

@@ -71,9 +71,10 @@ class JavascriptAPIMenu: JavascriptAPI, JavascriptAPIMenuExportable {
   }
 
   func forceUpdate() {
-    Utility.executeOnMainThread {
-      AppDelegate.shared.menuController?.updatePluginMenu()
-    }
+    // A plugin can call this while the first PlayerCore is still inside its
+    // one-time initializer. Deferring avoids recursively entering
+    // PlayerCore.active/first from the same dispatch_once.
+    AppDelegate.shared.menuController?.requestPluginMenuUpdate()
   }
 }
 

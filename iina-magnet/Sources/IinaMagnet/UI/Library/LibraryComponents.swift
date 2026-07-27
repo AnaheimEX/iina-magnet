@@ -203,6 +203,7 @@ struct PosterArt: View {
 struct PosterCard: View {
     let item: LibraryItemViewModel
     var onOpen: () -> Void = {}
+    var onRemove: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -242,6 +243,11 @@ struct PosterCard: View {
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: onOpen)
+        .contextMenu {
+            Button(role: .destructive, action: onRemove) {
+                Label("从媒体库移除", systemImage: "trash")
+            }
+        }
     }
 
     private var kindBadge: some View {
@@ -280,6 +286,7 @@ struct PosterCard: View {
 struct LibraryListRow: View {
     let item: LibraryItemViewModel
     var onOpen: () -> Void = {}
+    var onRemove: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 12) {
@@ -315,5 +322,10 @@ struct LibraryListRow: View {
         .background(LibraryTokens.bg2.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
         .contentShape(Rectangle())
         .onTapGesture(perform: onOpen)
+        .contextMenu {
+            Button(role: .destructive, action: onRemove) {
+                Label("从媒体库移除", systemImage: "trash")
+            }
+        }
     }
 }

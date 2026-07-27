@@ -753,7 +753,7 @@ struct Preference {
     case onlyWhenOpen
     case never
 
-    static var defaultValue = ResizeWindowTiming.onlyWhenOpen
+    static var defaultValue = ResizeWindowTiming.never
 
     init?(key: Key) {
       self.init(rawValue: Preference.integer(for: key))
@@ -1012,7 +1012,7 @@ struct Preference {
 
     .usePhysicalResolution: true,
     .initialWindowSizePosition: "",
-    .resizeWindowTiming: ResizeWindowTiming.onlyWhenOpen.rawValue,
+    .resizeWindowTiming: ResizeWindowTiming.defaultValue.rawValue,
     .resizeWindowOption: ResizeWindowOption.videoSize10.rawValue,
     .showRemainingTime: false,
     .scaleRemainingTime: false,

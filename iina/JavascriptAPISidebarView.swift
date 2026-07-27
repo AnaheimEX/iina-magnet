@@ -23,7 +23,8 @@ class JavascriptAPISidebarView: JavascriptAPI, JavascriptAPISidebarViewExportabl
   private lazy var messageHub = JavascriptMessageHub(reference: self)
 
   override func cleanUp(_ instance: JavascriptPluginInstance) {
-    player!.mainWindow.pluginView.removePluginTab(withIdentifier: instance.plugin.identifier)
+    guard let player else { return }
+    player.mainWindow.pluginView.removePluginTab(withIdentifier: instance.identifier)
   }
 
   func loadFile(_ path: String) {

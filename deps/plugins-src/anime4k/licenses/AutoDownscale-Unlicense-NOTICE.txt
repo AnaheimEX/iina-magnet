@@ -1,0 +1,15 @@
+Anime4K AutoDownscalePre public-domain notice
+
+This notice applies only to:
+
+  shaders/Anime4K_AutoDownscalePre_x2.glsl
+  shaders/Anime4K_AutoDownscalePre_x4.glsl
+
+SPDX license identifier: Unlicense
+
+The pinned Anime4K upstream tree does not provide a standalone Unlicense file
+and does not name a copyright holder for these two files. Each bundled file is
+kept byte-for-byte identical to upstream and contains the complete 24-line
+public-domain dedication and warranty disclaimer in its own source header.
+That retained header is the controlling notice for the file. This convenience
+notice does not replace or modify it.

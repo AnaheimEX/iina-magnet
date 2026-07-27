@@ -45,6 +45,13 @@ public struct LibraryEditor {
         try context.save()
     }
 
+    /// Removes one work and its catalog-only descendants from SwiftData.
+    /// Source media is intentionally untouched; this is not a file deletion.
+    public func removeFromLibrary(_ title: Title) throws {
+        context.delete(title)
+        try context.save()
+    }
+
     /// 手动修改：override core fields by hand. Only non-empty edits are applied,
     /// and a manual edit is treated as user-confirmed (score 1.0).
     public func applyManual(_ edits: ManualEdits, to title: Title) throws {
