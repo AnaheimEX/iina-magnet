@@ -44,6 +44,10 @@ public enum IinaMagnetBootstrap {
         guard didStart else { return }
         didStart = false
         logger.info("IinaMagnetBootstrap.shutdown")
+        WindowFactory.shared.flushWindowFrames()
+        Task {
+            await MikanWebViewStore.shared.flushCookieSnapshot()
+        }
     }
 
     /// Opens the media-library window. The entry point lives on iina's initial

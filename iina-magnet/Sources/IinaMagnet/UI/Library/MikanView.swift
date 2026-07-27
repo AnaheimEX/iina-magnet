@@ -11,6 +11,7 @@
 import SwiftUI
 import WebKit
 import OSLog
+import AppKit
 
 public struct MikanView: View {
     private static let logger = Logger(subsystem: "iina-magnet", category: "mikan")
@@ -42,8 +43,30 @@ public struct MikanView: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(LibraryTokens.sep)
-            MikanWebView(navigator: navigator, pageZoom: pageZoom * CGFloat(userZoom)) { name, url in
-                pending = Torrent(name: name, url: url)
+            ZStack {
+                MikanWebView(navigator: navigator, pageZoom: pageZoom * CGFloat(userZoom)) { name, url in
+                    pending = Torrent(name: name, url: url)
+                }
+                switch navigator.loadState {
+                case .idle, .loading:
+                    ProgressView("正在打开蜜柑计划…")
+                        .controlSize(.small)
+                        .padding(18)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                case .failed(let message):
+                    VStack(spacing: 10) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 28)).foregroundStyle(LibraryTokens.warn)
+                        Text("蜜柑页面加载失败").font(.system(size: 14, weight: .semibold))
+                        Text(message).font(.system(size: 11)).foregroundStyle(LibraryTokens.text2)
+                            .multilineTextAlignment(.center).frame(maxWidth: 420)
+                        Button("重新加载") { navigator.retryHome() }.controlSize(.small)
+                    }
+                    .padding(20)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                case .loaded:
+                    EmptyView()
+                }
             }
         }
         .background(LibraryTokens.bg)
@@ -78,8 +101,15 @@ public struct MikanView: View {
         HStack(spacing: 12) {
             navButton("chevron.backward", help: "后退", enabled: navigator.canGoBack) { navigator.goBack() }
             navButton("chevron.forward", help: "前进", enabled: navigator.canGoForward) { navigator.goForward() }
-            navButton("arrow.clockwise", help: "刷新") { navigator.reload() }
-            navButton("house", help: "蜜柑首页") { navigator.goHome() }
+            navButton("arrow.clockwise", help: "刷新", enabled: navigator.isReady) { navigator.reload() }
+            navButton("house", help: "蜜柑首页", enabled: navigator.isReady) { navigator.goHome() }
+            navButton("person.crop.circle.badge.xmark", help: "重置蜜柑登录状态",
+                      enabled: navigator.isReady) {
+                Task {
+                    await MikanWebViewStore.shared.resetLoginState()
+                    showToast("已清除蜜柑登录状态，请重新登录")
+                }
+            }
         }
         .padding(.leading, 6)
     }
@@ -202,6 +232,28 @@ enum MikanTitle {
     }
 }
 
+enum MikanNewWindowDestination: Equatable {
+    case currentWebView
+    case externalBrowser
+    case ignore
+
+    static func resolve(url: URL, sourceHost: String,
+                        isUserActivated: Bool = false, isMainFrame: Bool = false) -> Self {
+        let scheme = url.scheme?.lowercased()
+        let trustedSource = MikanCookieArchive.isSupported(host: sourceHost)
+        if scheme == "https", MikanCookieArchive.isSupported(host: url.host ?? "") {
+            return .currentWebView
+        }
+        if trustedSource,
+           scheme == "magnet" || (scheme == "https" && url.pathExtension.lowercased() == "torrent") {
+            return .currentWebView
+        }
+        if trustedSource, isUserActivated, isMainFrame,
+           scheme == "http" || scheme == "https" { return .externalBrowser }
+        return .ignore
+    }
+}
+
 // MARK: - Web navigation
 
 /// Bridges the SwiftUI nav buttons to the underlying WKWebView: holds a weak
@@ -209,20 +261,50 @@ enum MikanTitle {
 /// buttons enable/disable correctly.
 @MainActor
 final class MikanWebNavigator: ObservableObject {
+    enum LoadState: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
     static let homeURL = URL(string: "https://mikanani.me/")!
 
     @Published var canGoBack = false
     @Published var canGoForward = false
+    @Published private(set) var isReady = false
+    @Published private(set) var loadState: LoadState = .idle
     fileprivate weak var webView: WKWebView?
 
-    func goBack() { webView?.goBack() }
-    func goForward() { webView?.goForward() }
-    func reload() { webView?.reload() }
-    func goHome() { webView?.load(URLRequest(url: Self.homeURL)) }
+    func goBack() { if isReady { webView?.goBack() } }
+    func goForward() { if isReady { webView?.goForward() } }
+    func reload() { if isReady { webView?.reload() } }
+    func goHome() { if isReady { webView?.load(URLRequest(url: Self.homeURL)) } }
+    func retryHome() {
+        setReady(true)
+        setLoadState(.loading)
+        webView?.load(URLRequest(url: Self.homeURL, cachePolicy: .reloadIgnoringLocalCacheData))
+    }
+
+    fileprivate func setReady(_ ready: Bool) {
+        guard isReady != ready else { return }
+        isReady = ready
+        if !ready {
+            if canGoBack { canGoBack = false }
+            if canGoForward { canGoForward = false }
+        }
+    }
 
     fileprivate func sync(_ webView: WKWebView) {
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
+        let nextCanGoBack = webView.canGoBack
+        let nextCanGoForward = webView.canGoForward
+        if canGoBack != nextCanGoBack { canGoBack = nextCanGoBack }
+        if canGoForward != nextCanGoForward { canGoForward = nextCanGoForward }
+    }
+
+    fileprivate func setLoadState(_ state: LoadState) {
+        guard loadState != state else { return }
+        loadState = state
     }
 }
 
@@ -234,21 +316,34 @@ final class MikanWebNavigator: ObservableObject {
 /// which would otherwise destroy the web view on every exit and drop a
 /// just-completed login until the next reload — the bug where the page reads
 /// "not logged in" until you switch pages and come back. The default
-/// (persistent) website data store keeps the login cookies across launches too.
+/// (persistent) website data store is the primary cookie store. Session cookies
+/// are also mirrored to Keychain and restored before the first navigation of a
+/// new launch; see `MikanCookiePersistence`.
 @MainActor
-final class MikanWebViewStore: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+final class MikanWebViewStore: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler,
+                               WKHTTPCookieStoreObserver {
     static let shared = MikanWebViewStore()
     static let messageName = "mikanTorrent"
+    private static let logger = Logger(subsystem: "iina-magnet", category: "mikan-web")
 
     let webView: WKWebView
     /// Set by the live `MikanWebView` so captured links reach the current view.
     var onCapture: ((_ name: String, _ url: String) -> Void)?
     /// The current view's navigator, which publishes back/forward state.
     weak var navigator: MikanWebNavigator?
+    private let cookiePersistence = MikanCookiePersistence()
+    private var preparationTask: Task<Void, Never>?
+    private var preparationDeadlineTask: Task<Void, Never>?
+    private var snapshotTask: Task<Void, Never>?
+    private var isPrepared = false
+    private var didStartInitialNavigation = false
+    private var currentLoadState: MikanWebNavigator.LoadState = .idle
+    private var isObservingCookies = false
+    private var isResettingCookies = false
 
     private override init() {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()   // persistent: login survives launches
+        config.websiteDataStore = .default()   // primary store; Keychain recovers session cookies
         let controller = WKUserContentController()
         config.userContentController = controller
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -259,27 +354,179 @@ final class MikanWebViewStore: NSObject, WKNavigationDelegate, WKScriptMessageHa
         controller.add(self, name: Self.messageName)
         controller.addUserScript(WKUserScript(source: MikanWebView.clickScript,
                                               injectionTime: .atDocumentEnd,
-                                              forMainFrameOnly: false))
+                                              forMainFrameOnly: true))
         webView.navigationDelegate = self
+        webView.uiDelegate = self
     }
 
-    /// Loads the home page only on first creation; later shows keep the current
-    /// (possibly logged-in) page instead of resetting to home.
-    func loadHomeIfNeeded() {
-        if webView.url == nil { webView.load(URLRequest(url: MikanWebNavigator.homeURL)) }
+    /// Hydrates any missing cookies before the first request. Later shows keep
+    /// the current (possibly logged-in) page instead of resetting to home.
+    func prepareAndLoadHomeIfNeeded() {
+        if isPrepared {
+            navigator?.setReady(true)
+            startInitialNavigationIfNeeded()
+            return
+        }
+        guard preparationTask == nil else { return }
+        navigator?.setReady(false)
+
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        if !isObservingCookies {
+            cookieStore.add(self)
+            isObservingCookies = true
+        }
+        publishLoadState(.loading)
+
+        // Cookie recovery improves login persistence, but it must never be a
+        // hard dependency for opening the site. If keychain hydration is
+        // slow, navigation starts anyway and a later restore still triggers a
+        // single safe reload.
+        preparationDeadlineTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, let self else { return }
+            Self.logger.warning("Mikan cookie restore exceeded startup deadline; loading page without blocking")
+            self.startInitialNavigationIfNeeded()
+        }
+        preparationTask = Task { [weak self] in
+            guard let self else { return }
+            let restoredCount = await cookiePersistence.restoreMissingCookies(into: cookieStore)
+            let navigationStartedBeforeRestore = didStartInitialNavigation
+            preparationDeadlineTask?.cancel()
+            preparationDeadlineTask = nil
+            startInitialNavigationIfNeeded()
+            if navigationStartedBeforeRestore, restoredCount > 0 {
+                Self.logger.info("Reloading Mikan once after late authentication-cookie restore")
+                webView.reload()
+            }
+            preparationTask = nil
+            scheduleCookieSnapshot()
+        }
+    }
+
+    private func startInitialNavigationIfNeeded() {
+        isPrepared = true
+        navigator?.setReady(true)
+        guard !didStartInitialNavigation else { return }
+        didStartInitialNavigation = true
+        publishLoadState(.loading)
+        webView.load(URLRequest(url: MikanWebNavigator.homeURL))
     }
 
     // Keep the back/forward button state in sync as pages load.
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        publishLoadState(.loading)
+    }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { navigator?.sync(webView) }
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { navigator?.sync(webView) }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        navigator?.sync(webView)
+        publishLoadState(.loaded)
+        scheduleCookieSnapshot()
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        Self.logger.error("Mikan navigation failed: \(error.localizedDescription, privacy: .public)")
+        publishLoadState(.failed(error.localizedDescription))
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+                 withError error: Error) {
+        Self.logger.error("Mikan provisional navigation failed: \(error.localizedDescription, privacy: .public)")
+        publishLoadState(.failed(error.localizedDescription))
+    }
+
+    /// Mikan opens many bangumi/episode links with `target=_blank`. WKWebView
+    /// silently drops those without a UI delegate, which made ordinary links
+    /// look broken. Keep Mikan and captured torrent links in this view; open an
+    /// explicit external web link in the user's browser.
+    func webView(_ webView: WKWebView,
+                 createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction,
+                 windowFeatures: WKWindowFeatures) -> WKWebView? {
+        guard navigationAction.targetFrame == nil,
+              let url = navigationAction.request.url else { return nil }
+        let sourceHost = navigationAction.sourceFrame.securityOrigin.host.isEmpty
+            ? webView.url?.host ?? ""
+            : navigationAction.sourceFrame.securityOrigin.host
+        switch MikanNewWindowDestination.resolve(
+            url: url,
+            sourceHost: sourceHost,
+            isUserActivated: navigationAction.navigationType == .linkActivated,
+            isMainFrame: navigationAction.sourceFrame.isMainFrame
+        ) {
+        case .currentWebView:
+            webView.load(navigationAction.request)
+        case .externalBrowser:
+            NSWorkspace.shared.open(url)
+        case .ignore:
+            break
+        }
+        return nil
+    }
+
+    private func publishLoadState(_ state: MikanWebNavigator.LoadState) {
+        currentLoadState = state
+        navigator?.setLoadState(state)
+    }
+
+    fileprivate func bind(navigator: MikanWebNavigator,
+                          onCapture: @escaping (_ name: String, _ url: String) -> Void) {
+        self.navigator = navigator
+        self.onCapture = onCapture
+        navigator.webView = webView
+    }
+
+    /// Publishing from `makeNSView` / `updateNSView` synchronously re-enters
+    /// SwiftUI's update transaction. Always call this from a deferred main-actor
+    /// task after the representable callback has returned.
+    fileprivate func publishBoundNavigatorState() {
+        guard let navigator else { return }
+        navigator.setReady(isPrepared || didStartInitialNavigation)
+        navigator.setLoadState(currentLoadState)
+        navigator.sync(webView)
+    }
+
+    func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
+        guard !isResettingCookies else { return }
+        scheduleCookieSnapshot()
+    }
+
+ func resetLoginState() async {
+     guard isPrepared, !isResettingCookies else { return }
+        isResettingCookies = true
+        navigator?.setReady(false)
+        snapshotTask?.cancel()
+        webView.stopLoading()
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        await cookiePersistence.clearAllCookies(from: cookieStore)
+        isResettingCookies = false
+     webView.load(URLRequest(url: MikanWebNavigator.homeURL))
+     navigator?.setReady(true)
+ }
+
+  func flushCookieSnapshot() async {
+     snapshotTask?.cancel()
+     let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+     await cookiePersistence.snapshot(from: cookieStore)
+  }
+
+  private func scheduleCookieSnapshot() {
+        snapshotTask?.cancel()
+        let cookieStore = webView.configuration.websiteDataStore.httpCookieStore
+        snapshotTask = Task { [weak self] in
+            guard let self else { return }
+            await cookiePersistence.snapshot(from: cookieStore)
+        }
+    }
 
     // Primary path: the injected click listener posts {name, url}.
     func userContentController(_ controller: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         guard message.name == Self.messageName,
+              MikanCookieArchive.isSupported(host: message.frameInfo.securityOrigin.host),
               let body = message.body as? [String: Any],
               let url = (body["url"] as? String)?.trimmingCharacters(in: .whitespaces),
-              !url.isEmpty else { return }
+              let captureURL = URL(string: url),
+              Self.isSupportedCaptureURL(captureURL) else { return }
         onCapture?(MikanTitle.clean(body["name"] as? String ?? ""), url)
     }
 
@@ -287,12 +534,17 @@ final class MikanWebViewStore: NSObject, WKNavigationDelegate, WKScriptMessageHa
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
-        if url.scheme == "magnet" {
+        let sourceHost = navigationAction.sourceFrame.securityOrigin.host
+        let trustedSource = sourceHost.isEmpty
+            ? MikanCookieArchive.isSupported(host: webView.url?.host ?? "")
+            : MikanCookieArchive.isSupported(host: sourceHost)
+        if url.scheme == "magnet", trustedSource {
             decisionHandler(.cancel)
             // Use the magnet's display name (real title) when present; else leave
             // empty so PikPak names it from the torrent metadata.
             onCapture?(Self.magnetName(url) ?? "", url.absoluteString)
-        } else if url.pathExtension.lowercased() == "torrent" {
+        } else if url.scheme?.lowercased() == "https",
+                  url.pathExtension.lowercased() == "torrent", trustedSource {
             decisionHandler(.cancel)
             // A .torrent URL's filename is just the info-hash — not a usable title
             // — so pass no name and let PikPak resolve the real one.
@@ -307,6 +559,11 @@ final class MikanWebViewStore: NSObject, WKNavigationDelegate, WKScriptMessageHa
         URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first { $0.name == "dn" }?.value?.removingPercentEncoding
     }
+
+    private static func isSupportedCaptureURL(_ url: URL) -> Bool {
+        if url.scheme?.lowercased() == "magnet" { return true }
+        return url.scheme?.lowercased() == "https" && url.pathExtension.lowercased() == "torrent"
+    }
 }
 
 private struct MikanWebView: NSViewRepresentable {
@@ -316,19 +573,19 @@ private struct MikanWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let store = MikanWebViewStore.shared
-        store.navigator = navigator
-        store.onCapture = onCapture
-        navigator.webView = store.webView
+        store.bind(navigator: navigator, onCapture: onCapture)
         store.webView.pageZoom = pageZoom
-        store.loadHomeIfNeeded()
-        navigator.sync(store.webView)   // reflect the persisted page's nav state
+        Task { @MainActor [weak navigator] in
+            guard let navigator, store.navigator === navigator else { return }
+            store.publishBoundNavigatorState()
+            store.prepareAndLoadHomeIfNeeded()
+        }
         return store.webView
     }
 
     func updateNSView(_ nsView: WKWebView, context: Context) {
         let store = MikanWebViewStore.shared
-        store.navigator = navigator
-        store.onCapture = onCapture
+        store.bind(navigator: navigator, onCapture: onCapture)
         if abs(nsView.pageZoom - pageZoom) > 0.01 { nsView.pageZoom = pageZoom }
     }
 
