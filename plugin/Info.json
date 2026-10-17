@@ -1,0 +1,14 @@
+{
+  "name": "PikPak + Mikan",
+  "identifier": "io.iina.magnet.cloud",
+  "version": "1.1.0",
+  "author": {
+    "name": "AnaheimEX and contributors"
+  },
+  "description": "Full native Mikan and PikPak windows with save-and-play in official IINA.",
+  "entry": "main.js",
+  "globalEntry": "global.js",
+  "permissions": [
+    "file-system"
+  ]
+}

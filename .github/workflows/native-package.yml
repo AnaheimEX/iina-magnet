@@ -1,0 +1,19 @@
+name: Native package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build native companion
+        working-directory: native
+        run: swift build --product IINACloud
+      - name: Run existing package tests
+        working-directory: native
+        run: swift test

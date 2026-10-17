@@ -1,0 +1,15 @@
+# Local build output and generated companion
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+plugin/companion/
+*.dSYM/
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.key
